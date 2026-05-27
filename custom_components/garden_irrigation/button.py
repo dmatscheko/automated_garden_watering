@@ -61,16 +61,18 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
 
     def __init__(self, coordinator: IrrigationCoordinator, zone_id: str) -> None:
         zone = coordinator.zones[zone_id]
-        # The slug used by HA to build entity_id comes from `_attr_name`, so
-        # using the run order produces button.garden_irrigation_zone_<order>.
+        # Friendly name = the user-supplied display name (updates dynamically
+        # via the `name` property below). entity_id is forced to use the run
+        # order so buttons sort naturally when picked in the UI.
         # unique_id stays uuid-based so the entity survives renames/reorders.
-        super().__init__(coordinator, f"zone_{zone_id}", f"Zone {zone.order}")
+        super().__init__(coordinator, f"zone_{zone_id}", zone.name)
         self._zone_id = zone_id
+        self.entity_id = f"button.garden_irrigation_zone_{zone.order}"
 
     @property
     def name(self) -> str:
         zone = self.coordinator.zones.get(self._zone_id)
-        return f"Zone {zone.order}" if zone else self._attr_name
+        return zone.name if zone else self._attr_name
 
     async def async_press(self) -> None:
         await self.coordinator.async_toggle_zone(self._zone_id)
