@@ -1,0 +1,98 @@
+# Example Lovelace dashboard view for Garden Irrigation.
+# Paste under "views:" in your dashboard YAML, or use as a starting point in the
+# UI editor. Replace the example zone unique IDs with the ones you actually have
+# in `button.garden_irrigation_zone_*`.
+#
+# The cards below color buttons by status using the `extra_state_attributes`
+# exposed by each zone button (`status` = idle | queued | running) and by the
+# global status sensor.
+
+title: Garden
+path: garden
+icon: mdi:sprinkler
+cards:
+  - type: vertical-stack
+    cards:
+      - type: entities
+        title: Garden Irrigation
+        show_header_toggle: false
+        entities:
+          - entity: sensor.garden_irrigation_status
+            name: Status
+          - entity: sensor.garden_irrigation_active_zone
+            name: Active zone
+          - entity: sensor.garden_irrigation_queue
+            name: Queue
+          - entity: number.garden_irrigation_watering_multiplier
+            name: Watering multiplier
+          - entity: time.garden_irrigation_daily_start_time
+            name: Daily start time
+          - entity: switch.garden_irrigation_daily_timer
+            name: Daily timer
+
+      - type: horizontal-stack
+        cards:
+          - type: button
+            name: Water all / STOP
+            icon: mdi:sprinkler-variant
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.garden_irrigation_water_all
+          - type: button
+            name: Backwash
+            icon: mdi:backup-restore
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.garden_irrigation_backwash
+
+      - type: grid
+        columns: 2
+        square: false
+        cards:
+          # Repeat this block for each zone. Color reflects `status` attribute:
+          #   idle = default, queued = amber, running = green.
+          - type: custom:button-card  # optional; falls back to plain button if not installed
+            entity: button.garden_irrigation_zone_REPLACE_ME
+            name: Zone 1
+            icon: mdi:water
+            show_state: false
+            tap_action:
+              action: perform-action
+              perform_action: button.press
+              target:
+                entity_id: button.garden_irrigation_zone_REPLACE_ME
+            state:
+              - operator: template
+                value: >-
+                  [[[ return states['button.garden_irrigation_zone_REPLACE_ME'].attributes.status === 'running' ]]]
+                styles:
+                  card:
+                    - background-color: '#2e7d32'
+                    - color: white
+              - operator: template
+                value: >-
+                  [[[ return states['button.garden_irrigation_zone_REPLACE_ME'].attributes.status === 'queued' ]]]
+                styles:
+                  card:
+                    - background-color: '#ef6c00'
+                    - color: white
+            label: >-
+              [[[
+                const a = states['button.garden_irrigation_zone_REPLACE_ME'].attributes;
+                if (a.status === 'running') return 'Running · ' + Math.max(0, a.remaining_seconds || 0) + 's left';
+                if (a.status === 'queued') return 'Queued #' + a.queue_position;
+                return 'Idle';
+              ]]]
+
+# Notes
+# -----
+# * The `custom:button-card` card (HACS frontend) is recommended for colored,
+#   templated zone buttons. Without it, use the built-in `type: button` card —
+#   you lose status coloring but the press action still works.
+# * Times in the UI are shown in seconds. To display M:SS, the status sensor
+#   exposes `phase_remaining_mmss` and `active_remaining_mmss` attributes you
+#   can render with a markdown card.

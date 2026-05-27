@@ -1,0 +1,117 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Garden Irrigation — global settings",
+        "description": "Set up your pump, backwash valve, and timing defaults. Both switches are optional — leave empty if you don't have that hardware.",
+        "data": {
+          "pump_switch": "Well pump switch (optional)",
+          "backwash_switch": "Backwash valve switch (optional)",
+          "multiplier": "Global watering multiplier",
+          "pump_pressure_delay": "Pump pressure build-up delay (seconds)",
+          "backwash_pressure_delay": "Backwash pressure build-up delay (seconds)",
+          "backwash_runtime": "Backwash valve runtime (seconds)",
+          "backwash_interval": "Automatic backwash interval — seconds of cumulative watering between automatic backwashes (0 = off)",
+          "backwash_threshold": "End-of-queue backwash threshold — minimum seconds of total watering before an end-of-queue backwash runs",
+          "daily_start": "Daily watering start time",
+          "daily_timer_enabled": "Enable daily timer"
+        },
+        "data_description": {
+          "pump_switch": "The Home Assistant switch entity that controls your well pump. Will be turned on before any valve opens.",
+          "backwash_switch": "The Home Assistant switch entity for the backwash valve. If empty, all backwash behavior is disabled.",
+          "multiplier": "Multiplies every zone's default duration (e.g. 2.5 = 2.5× longer).",
+          "pump_pressure_delay": "Time to wait after turning on the pump and before opening a valve. Runs once at the start of a queue.",
+          "backwash_pressure_delay": "Time to wait after turning on the pump (or keeping it on) and before opening the backwash valve.",
+          "backwash_runtime": "How long the backwash valve stays open.",
+          "backwash_interval": "After this many seconds of cumulative watering, the controller pauses watering and runs a backwash, then resumes.",
+          "backwash_threshold": "When a queue finishes, run a final backwash if at least this much watering happened (or if the queue was started by the timer).",
+          "daily_start": "Time of day to automatically start 'Water all'.",
+          "daily_timer_enabled": "If on, the daily timer fires; if off, the timer does nothing."
+        }
+      },
+      "zone": {
+        "title": "Add an irrigation zone",
+        "description": "Add one zone. After saving, you can add more.",
+        "data": {
+          "name": "Display name",
+          "entity_id": "Zone valve switch",
+          "duration": "Default watering duration (seconds)",
+          "order": "Run order for 'Water all' (lower runs first)"
+        },
+        "data_description": {
+          "name": "Friendly name shown in the dashboard.",
+          "entity_id": "The Home Assistant switch entity that opens this zone's valve.",
+          "duration": "Default time this zone runs. Effective time = duration × global multiplier.",
+          "order": "Smaller numbers run earlier. Use gaps (10, 20, 30…) to make later reordering easier."
+        }
+      },
+      "zone_more": {
+        "title": "Add another zone?",
+        "description": "{count} zone(s) configured so far.",
+        "data": {"add_another": "Add another zone"}
+      }
+    },
+    "abort": {
+      "already_configured": "Garden Irrigation is already configured. Use 'Configure' on the existing entry to change settings."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Garden Irrigation",
+        "description": "Edit global settings or manage zones.",
+        "menu_options": {
+          "globals": "Global settings (timings, multiplier, daily timer)",
+          "zones_list": "Zones (add, edit, delete, reorder)"
+        }
+      },
+      "globals": {
+        "title": "Global settings",
+        "data": {
+          "pump_switch": "Well pump switch (optional)",
+          "backwash_switch": "Backwash valve switch (optional)",
+          "multiplier": "Global watering multiplier",
+          "pump_pressure_delay": "Pump pressure build-up delay (seconds)",
+          "backwash_pressure_delay": "Backwash pressure build-up delay (seconds)",
+          "backwash_runtime": "Backwash valve runtime (seconds)",
+          "backwash_interval": "Automatic backwash interval (seconds, 0 = off)",
+          "backwash_threshold": "End-of-queue backwash threshold (seconds)",
+          "daily_start": "Daily watering start time",
+          "daily_timer_enabled": "Enable daily timer"
+        },
+        "data_description": {
+          "pump_switch": "Switch turned on before any valve opens.",
+          "backwash_switch": "Backwash valve switch. Leave empty to disable backwash.",
+          "multiplier": "Multiplies every zone's default duration.",
+          "pump_pressure_delay": "Wait this long after the pump comes on before opening a valve.",
+          "backwash_pressure_delay": "Wait this long with pump on before opening the backwash valve.",
+          "backwash_runtime": "How long the backwash valve stays open.",
+          "backwash_interval": "Run a backwash automatically after this much cumulative watering. 0 disables it.",
+          "backwash_threshold": "Final backwash runs only if at least this much watering happened (or if the queue was timer-started).",
+          "daily_start": "When the daily timer fires.",
+          "daily_timer_enabled": "Whether the daily timer is active."
+        }
+      },
+      "zones_list": {
+        "title": "Zones",
+        "description": "Pick a zone to edit/delete or add a new one. To reorder, edit a zone and change its 'Run order' number.",
+        "data": {"action": "Action"}
+      },
+      "zone_edit": {
+        "title": "Zone",
+        "data": {
+          "name": "Display name",
+          "entity_id": "Zone valve switch",
+          "duration": "Default watering duration (seconds)",
+          "order": "Run order for 'Water all' (lower runs first)"
+        },
+        "data_description": {
+          "name": "Friendly name shown in the dashboard.",
+          "entity_id": "Home Assistant switch entity for this zone's valve.",
+          "duration": "Default seconds; effective time = duration × multiplier.",
+          "order": "Smaller numbers run earlier."
+        }
+      }
+    }
+  }
+}

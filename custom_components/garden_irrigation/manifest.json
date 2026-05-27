@@ -1,0 +1,13 @@
+{
+  "domain": "garden_irrigation",
+  "name": "Garden Irrigation",
+  "version": "0.1.0",
+  "config_flow": true,
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "codeowners": ["@dmatscheko"],
+  "dependencies": [],
+  "requirements": [],
+  "documentation": "https://github.com/dmatscheko/garden_irrigation",
+  "issue_tracker": "https://github.com/dmatscheko/garden_irrigation/issues"
+}
