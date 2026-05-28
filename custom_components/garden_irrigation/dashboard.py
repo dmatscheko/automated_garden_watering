@@ -18,10 +18,14 @@ AMBER = "#ef6c00"
 # Backwash gives all four "main" buttons a matching blue icon, separating them
 # from the white-icon zone buttons.
 ICON_BLUE = "var(--paper-item-icon-color, var(--state-icon-color))"
-# The active icon color button-card gives an "on" switch (Details, Pump). Used
-# to turn the Water all / Backwash icons yellow while they're running, matching
-# the switch buttons.
-ICON_YELLOW = "var(--paper-item-icon-active-color)"
+# The active icon color an "on" switch (Details, Pump) gets. Used to turn the
+# Water all / Backwash icons yellow while running. Includes a fallback chain so
+# it never resolves to "undefined" (which would make the icon inherit white):
+# modern switch-active color -> legacy active var -> a literal HA amber.
+ICON_YELLOW = (
+    "var(--state-switch-active-color, "
+    "var(--paper-item-icon-active-color, #fdd835))"
+)
 
 
 # Dashboard labels per language (the generated dashboard's visible texts).

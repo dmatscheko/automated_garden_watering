@@ -47,7 +47,7 @@ cards:
                     - background-color: '#2e7d32'
                     - color: white
                   icon:
-                    - color: var(--paper-item-icon-active-color)
+                    - color: var(--state-switch-active-color, var(--paper-item-icon-active-color, #fdd835))
           - type: custom:button-card
             entity: switch.garden_irrigation_show_details
             name: Details
@@ -117,7 +117,7 @@ cards:
                     - background-color: '#2e7d32'
                     - color: white
                   icon:
-                    - color: var(--paper-item-icon-active-color)
+                    - color: var(--state-switch-active-color, var(--paper-item-icon-active-color, #fdd835))
             label: >-
               [[[
                 const a = states['button.garden_irrigation_backwash'].attributes;
