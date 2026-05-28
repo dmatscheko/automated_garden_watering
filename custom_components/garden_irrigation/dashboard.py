@@ -18,6 +18,10 @@ AMBER = "#ef6c00"
 # Backwash gives all four "main" buttons a matching blue icon, separating them
 # from the white-icon zone buttons.
 ICON_BLUE = "var(--paper-item-icon-color, var(--state-icon-color))"
+# The active icon color button-card gives an "on" switch (Details, Pump). Used
+# to turn the Water all / Backwash icons yellow while they're running, matching
+# the switch buttons.
+ICON_YELLOW = "var(--paper-item-icon-active-color)"
 
 
 # Dashboard labels per language (the generated dashboard's visible texts).
@@ -86,6 +90,14 @@ def _press_action(eid: str) -> dict[str, Any]:
 
 def _styled(color: str) -> dict[str, Any]:
     return {"card": [{"background-color": color}, {"color": "white"}]}
+
+
+def _styled_active(color: str) -> dict[str, Any]:
+    """Like _styled but also turns the icon yellow (for the main action buttons)."""
+    return {
+        "card": [{"background-color": color}, {"color": "white"}],
+        "icon": [{"color": ICON_YELLOW}],
+    }
 
 
 def _button_card(
@@ -157,7 +169,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
                 {
                     "operator": "template",
                     "value": f"[[[ return states['{water_all}'].attributes.running === true ]]]",
-                    "styles": _styled(GREEN),
+                    "styles": _styled_active(GREEN),
                 }
             ],
         )
@@ -197,7 +209,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
                 {
                     "operator": "template",
                     "value": f"[[[ return states['{backwash}'].attributes.status === 'running' ]]]",
-                    "styles": _styled(GREEN),
+                    "styles": _styled_active(GREEN),
                 }
             ],
             label=backwash_label,
