@@ -60,7 +60,7 @@ _LABELS = {
         "multiplier": "Bewässerungs-Multiplikator",
         "daily_start": "Tägliche Startzeit",
         "daily_timer": "Tages-Timer",
-        "water_all": "Alle bewässern / STOPP",
+        "water_all": "Alles bewässern / STOPP",
         "details": "Details",
         "backwash": "Rückspülung",
         "pump": "Pumpe (manuell)",

@@ -27,7 +27,7 @@
           "backwash_flush_runtime": "Spül-Phase: Die Pumpe wird wieder EINgeschaltet (Rückspülventil bleibt offen), um den gelösten Schmutz herauszuspülen.",
           "backwash_interval": "Nach so vielen Sekunden kumulierter Bewässerung pausiert die Steuerung die Bewässerung, führt eine Rückspülung durch und setzt dann fort.",
           "backwash_threshold": "Wenn eine Warteschlange endet, läuft eine abschließende Rückspülung, sofern mindestens so viel bewässert wurde (oder die Warteschlange vom Timer gestartet wurde).",
-          "daily_start": "Uhrzeit, zu der „Alle bewässern“ automatisch startet.",
+          "daily_start": "Uhrzeit, zu der „Alles bewässern“ automatisch startet.",
           "daily_timer_enabled": "Wenn an, löst der Tages-Timer aus; wenn aus, passiert nichts."
         }
       },
@@ -38,7 +38,7 @@
           "name": "Anzeigename",
           "entity_id": "Zonenventil-Schalter",
           "duration": "Standard-Bewässerungsdauer (Sekunden)",
-          "order": "Reihenfolge für „Alle bewässern“ (kleiner zuerst)"
+          "order": "Reihenfolge für „Alles bewässern“ (kleiner zuerst)"
         },
         "data_description": {
           "name": "Anzeigename, der im Dashboard erscheint.",
@@ -107,7 +107,7 @@
           "name": "Anzeigename",
           "entity_id": "Zonenventil-Schalter",
           "duration": "Standard-Bewässerungsdauer (Sekunden)",
-          "order": "Reihenfolge für „Alle bewässern“ (kleiner zuerst)",
+          "order": "Reihenfolge für „Alles bewässern“ (kleiner zuerst)",
           "delete_zone": "Diese Zone löschen"
         },
         "data_description": {
