@@ -39,7 +39,12 @@ cards:
           - entity: switch.garden_irrigation_daily_timer
             name: Daily timer
 
-      - type: horizontal-stack
+      # All buttons share one 2-column grid, so the global actions (Water all,
+      # Backwash, Pump) are the same full size as the zone buttons and have room
+      # for their last-run labels. Their icons keep them distinct.
+      - type: grid
+        columns: 2
+        square: false
         cards:
           - type: custom:button-card
             entity: button.garden_irrigation_water_all
@@ -108,11 +113,6 @@ cards:
                 if (e.attributes.last_run_friendly) return 'Last: ' + e.attributes.last_run_friendly;
                 return 'Never run';
               ]]]
-
-      - type: grid
-        columns: 2
-        square: false
-        cards:
           # Repeat this block for each zone. Color reflects `status` attribute:
           #   idle = default, queued = amber, running = green.
           - type: custom:button-card  # optional; falls back to plain button if not installed

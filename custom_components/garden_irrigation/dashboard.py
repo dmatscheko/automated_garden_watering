@@ -188,12 +188,14 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             )
         )
 
+    # All buttons share one 2-column grid so the global actions are the same
+    # (full) size as the zone buttons and have room for their last-run labels.
+    # Their distinct icons keep them recognizable. Actions come first.
     inner_cards: list[dict[str, Any]] = [entities_card]
-    if action_cards:
-        inner_cards.append({"type": "horizontal-stack", "cards": action_cards})
-    if zone_cards:
+    grid_cards = action_cards + zone_cards
+    if grid_cards:
         inner_cards.append(
-            {"type": "grid", "columns": 2, "square": False, "cards": zone_cards}
+            {"type": "grid", "columns": 2, "square": False, "cards": grid_cards}
         )
 
     view = {
