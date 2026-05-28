@@ -32,7 +32,7 @@ cards:
             # Blue icon to match the other 3 main buttons (Details, Backwash, Pump).
             styles:
               icon:
-                - color: var(--paper-item-icon-color)
+                - color: var(--paper-item-icon-color, var(--state-icon-color))
             tap_action:
               action: perform-action
               perform_action: button.press
@@ -100,7 +100,7 @@ cards:
             # Blue icon to match the other 3 main buttons.
             styles:
               icon:
-                - color: var(--paper-item-icon-color)
+                - color: var(--paper-item-icon-color, var(--state-icon-color))
             tap_action:
               action: perform-action
               perform_action: button.press

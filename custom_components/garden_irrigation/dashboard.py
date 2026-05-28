@@ -12,10 +12,62 @@ from .coordinator import IrrigationCoordinator
 
 GREEN = "#2e7d32"
 AMBER = "#ef6c00"
-# The default inactive icon color button-card uses for the switch buttons
-# (Details, Pump). Applying it to the Water all / Backwash buttons gives all
-# four "main" buttons a matching blue icon, separating them from the zones.
-ICON_BLUE = "var(--paper-item-icon-color)"
+# Exactly the fallback chain button-card uses for the switch-button icons
+# (Details, Pump). `--paper-item-icon-color` is usually undefined, so it falls
+# back to `--state-icon-color` (the HA blue). Applying this to Water all /
+# Backwash gives all four "main" buttons a matching blue icon, separating them
+# from the white-icon zone buttons.
+ICON_BLUE = "var(--paper-item-icon-color, var(--state-icon-color))"
+
+
+# Dashboard labels per language (the generated dashboard's visible texts).
+_LABELS = {
+    "en": {
+        "view_title": "Garden",
+        "status": "Status",
+        "step_remaining": "Current step time remaining",
+        "queue_remaining": "Queue time remaining",
+        "active_zone": "Active zone",
+        "queue": "Queue",
+        "multiplier": "Watering multiplier",
+        "daily_start": "Daily start time",
+        "daily_timer": "Daily timer",
+        "water_all": "Water all / STOP",
+        "details": "Details",
+        "backwash": "Backwash",
+        "pump": "Pump (manual)",
+        "running": "Running",
+        "queued": "Queued #",
+        "last": "Last: ",
+        "never": "Never run",
+        "on": "On",
+    },
+    "de": {
+        "view_title": "Garten",
+        "status": "Status",
+        "step_remaining": "Aktueller Schritt – Restzeit",
+        "queue_remaining": "Warteschlange – Restzeit",
+        "active_zone": "Aktive Zone",
+        "queue": "Warteschlange",
+        "multiplier": "Bewässerungs-Multiplikator",
+        "daily_start": "Tägliche Startzeit",
+        "daily_timer": "Tages-Timer",
+        "water_all": "Alle bewässern / STOPP",
+        "details": "Details",
+        "backwash": "Rückspülung",
+        "pump": "Pumpe (manuell)",
+        "running": "Läuft",
+        "queued": "Warteschlange #",
+        "last": "Zuletzt: ",
+        "never": "Nie gelaufen",
+        "on": "An",
+    },
+}
+
+
+def _labels(hass: HomeAssistant) -> dict[str, str]:
+    lang = (hass.config.language or "en").lower()
+    return _LABELS["de"] if lang.startswith("de") else _LABELS["en"]
 
 
 def _resolve(hass: HomeAssistant, entry_id: str, suffix: str, domain: str) -> str | None:
@@ -61,6 +113,7 @@ def _button_card(
 def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> str:
     """Return a YAML string with a complete view for this integration."""
     entry_id = coordinator.entry_id
+    L = _labels(hass)
 
     water_all = _resolve(hass, entry_id, "water_all", "button")
     backwash = _resolve(hass, entry_id, "backwash", "button")
@@ -77,14 +130,14 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
 
     # Entities card (drop any that couldn't be resolved).
     entity_rows = [
-        (status, "Status"),
-        (step_remaining, "Current step time remaining"),
-        (queue_remaining, "Queue time remaining"),
-        (active_zone, "Active zone"),
-        (queue, "Queue"),
-        (multiplier, "Watering multiplier"),
-        (daily_start, "Daily start time"),
-        (daily_timer, "Daily timer"),
+        (status, L["status"]),
+        (step_remaining, L["step_remaining"]),
+        (queue_remaining, L["queue_remaining"]),
+        (active_zone, L["active_zone"]),
+        (queue, L["queue"]),
+        (multiplier, L["multiplier"]),
+        (daily_start, L["daily_start"]),
+        (daily_timer, L["daily_timer"]),
     ]
     entities_card = {
         "type": "entities",
@@ -98,7 +151,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
     water_all_card = (
         _button_card(
             water_all,
-            "Water all / STOP",
+            L["water_all"],
             "mdi:sprinkler-variant",
             [
                 {
@@ -118,7 +171,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         {
             "type": "custom:button-card",
             "entity": details,
-            "name": "Details",
+            "name": L["details"],
             "icon": "mdi:information-outline",
             "show_state": False,
             "tap_action": {"action": "toggle"},
@@ -132,13 +185,13 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
     if backwash:
         backwash_label = (
             f"[[[ const a = states['{backwash}'].attributes; "
-            "if (a.status === 'running') return 'Running'; "
-            "if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly; "
-            "return 'Never run'; ]]]"
+            f"if (a.status === 'running') return '{L['running']}'; "
+            f"if (a.last_run_friendly) return '{L['last']}' + a.last_run_friendly; "
+            f"return '{L['never']}'; ]]]"
         )
         backwash_card = _button_card(
             backwash,
-            "Backwash",
+            L["backwash"],
             "mdi:backup-restore",
             [
                 {
@@ -157,14 +210,14 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         # buttons: green while on, with a "last run" line when off.
         pump_label = (
             f"[[[ const e = states['{manual_pump}']; "
-            "if (e.state === 'on') return 'On'; "
-            "if (e.attributes.last_run_friendly) return 'Last: ' + e.attributes.last_run_friendly; "
-            "return 'Never run'; ]]]"
+            f"if (e.state === 'on') return '{L['on']}'; "
+            f"if (e.attributes.last_run_friendly) return '{L['last']}' + e.attributes.last_run_friendly; "
+            f"return '{L['never']}'; ]]]"
         )
         pump_card = {
             "type": "custom:button-card",
             "entity": manual_pump,
-            "name": "Pump (manual)",
+            "name": L["pump"],
             "icon": "mdi:water-pump",
             "show_state": False,
             "show_label": True,
@@ -183,10 +236,10 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         label = (
             f"[[[ const a = states['{eid}'].attributes; "
             "if (a.status === 'running') { const s = Math.max(0, a.remaining_seconds || 0); "
-            "return 'Running ' + Math.floor(s/60) + ':' + ('0'+(s%60)).slice(-2); } "
-            "if (a.status === 'queued') return 'Queued #' + a.queue_position; "
-            "if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly; "
-            "return 'Never run'; ]]]"
+            f"return '{L['running']} ' + Math.floor(s/60) + ':' + ('0'+(s%60)).slice(-2); }} "
+            f"if (a.status === 'queued') return '{L['queued']}' + a.queue_position; "
+            f"if (a.last_run_friendly) return '{L['last']}' + a.last_run_friendly; "
+            f"return '{L['never']}'; ]]]"
         )
         zone_cards.append(
             _button_card(
@@ -240,7 +293,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             inner_cards.append(_grid(all_buttons))
 
     view = {
-        "title": "Garden",
+        "title": L["view_title"],
         "path": "garden-irrigation",
         "icon": "mdi:sprinkler",
         "cards": [{"type": "vertical-stack", "cards": inner_cards}],

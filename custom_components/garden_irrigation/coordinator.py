@@ -269,19 +269,32 @@ class IrrigationCoordinator:
         self._persist_last_run()
         self._notify()
 
-    @staticmethod
-    def _friendly_dt(dt: datetime | None) -> str | None:
-        """'Today 14:30' / 'Yesterday 09:00' / 'Mon 09:00' / 'May 03'."""
+    def _friendly_dt(self, dt: datetime | None) -> str | None:
+        """'Today 14:30' / 'Yesterday 09:00' / 'Mon 09:00' / 'May 03'.
+
+        Localized to German when Home Assistant's language is German.
+        """
         if not dt:
             return None
         local = dt_util.as_local(dt)
         delta_days = (dt_util.now().date() - local.date()).days
+        hm = local.strftime("%H:%M")
+        de = (self.hass.config.language or "en").lower().startswith("de")
         if delta_days <= 0:
-            return f"Today {local:%H:%M}"
+            return f"{'Heute' if de else 'Today'} {hm}"
         if delta_days == 1:
-            return f"Yesterday {local:%H:%M}"
+            return f"{'Gestern' if de else 'Yesterday'} {hm}"
         if delta_days < 7:
+            if de:
+                weekday = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][local.weekday()]
+                return f"{weekday} {hm}"
             return local.strftime("%a %H:%M")
+        if de:
+            months = [
+                "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
+                "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
+            ]
+            return f"{local.day:02d}. {months[local.month - 1]}"
         return local.strftime("%b %d")
 
     def zone_last_run(self, zone_id: str) -> datetime | None:
