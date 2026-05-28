@@ -33,15 +33,18 @@ The setup flow asks for the pump and backwash switch (both optional), and at lea
 
 | Entity | Description |
 |---|---|
-| `button.garden_irrigation_water_all` | Run all zones in order; pressing again while queue is active = emergency stop. |
-| `button.garden_irrigation_backwash` | Immediate backwash (never queued). |
-| `button.garden_irrigation_zone_<order>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<order>` suffix is the zone's run order, so the buttons sort naturally in the UI. The friendly zone name set during setup is exposed in the button's `zone_name` attribute. |
+| `button.garden_irrigation_water_all` | Run all zones in order; pressing again while queue is active = emergency stop. Attribute `running` for coloring. |
+| `button.garden_irrigation_backwash` | Immediate backwash (never queued). Attribute `status` (`running`/`idle`) for coloring. |
+| `button.garden_irrigation_zone_<order>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<order>` suffix is the zone's run order, so the buttons sort naturally in the UI. The friendly zone name set during setup is the entity's display name and is also in the `zone_name` attribute. |
+| `button.garden_irrigation_generate_dashboard_yaml` | Config button: generates a complete dashboard YAML for your exact entities/zones and shows it in a notification (also writes `garden_irrigation_dashboard.yaml` to your config folder). |
 | `number.garden_irrigation_multiplier` | Global watering multiplier. |
 | `time.garden_irrigation_daily_start` | Daily start time. |
 | `switch.garden_irrigation_daily_timer` | Enable/disable the daily timer. |
 | `sensor.garden_irrigation_status` | `idle`, `pump_pressure`, `watering`, `backwash_pressure`, `backwash`. Attributes: queue, active zone, remaining seconds. |
 | `sensor.garden_irrigation_active_zone` | Currently watering zone name (or `none`). |
 | `sensor.garden_irrigation_queue` | Comma-separated upcoming zones. |
+| `sensor.garden_irrigation_current_step_time_remaining` | Countdown (`H:MM:SS`) for the active zone, or the backwash while it runs. Attributes: `hours`, `minutes`, `seconds`, `total_seconds`, `phase`, `label`. |
+| `sensor.garden_irrigation_queue_time_remaining` | Countdown (`H:MM:SS`) of all remaining watering in the queue. Pauses (holds steady) during backwash. Attributes: `hours`, `minutes`, `seconds`, `total_seconds`. |
 
 ## Safety
 

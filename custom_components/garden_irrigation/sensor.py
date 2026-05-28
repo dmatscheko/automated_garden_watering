@@ -6,7 +6,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, STATE_IDLE
+from .const import (
+    DOMAIN,
+    STATE_BACKWASH,
+    STATE_BACKWASH_PRESSURE,
+    STATE_IDLE,
+)
 from .coordinator import IrrigationCoordinator
 from .entity import IrrigationBaseEntity
 
@@ -20,6 +25,8 @@ async def async_setup_entry(
             StatusSensor(coordinator),
             ActiveZoneSensor(coordinator),
             QueueSensor(coordinator),
+            CurrentStepRemainingSensor(coordinator),
+            QueueRemainingSensor(coordinator),
         ]
     )
 
@@ -27,6 +34,22 @@ async def async_setup_entry(
 def _fmt_mmss(seconds: int) -> str:
     seconds = max(0, int(seconds))
     return f"{seconds // 60:02d}:{seconds % 60:02d}"
+
+
+def _fmt_hms(seconds: int) -> str:
+    seconds = max(0, int(seconds))
+    return f"{seconds // 3600:d}:{(seconds % 3600) // 60:02d}:{seconds % 60:02d}"
+
+
+def _hms_attrs(seconds: int) -> dict:
+    seconds = max(0, int(seconds))
+    return {
+        "total_seconds": seconds,
+        "hours": seconds // 3600,
+        "minutes": (seconds % 3600) // 60,
+        "seconds": seconds % 60,
+        "formatted": _fmt_hms(seconds),
+    }
 
 
 class StatusSensor(IrrigationBaseEntity, SensorEntity):
@@ -113,3 +136,51 @@ class QueueSensor(IrrigationBaseEntity, SensorEntity):
             "ids": list(rt.queue),
             "idle": rt.state == STATE_IDLE,
         }
+
+
+class CurrentStepRemainingSensor(IrrigationBaseEntity, SensorEntity):
+    """Time left in the active zone, or in the backwash while it runs."""
+
+    _attr_icon = "mdi:timer-sand"
+
+    def __init__(self, coordinator: IrrigationCoordinator) -> None:
+        super().__init__(coordinator, "step_remaining", "Current step time remaining")
+
+    @property
+    def native_value(self) -> str:
+        return _fmt_hms(self.coordinator.current_step_remaining_seconds())
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        rt = self.coordinator.rt
+        attrs = _hms_attrs(self.coordinator.current_step_remaining_seconds())
+        active_id = self.coordinator.active_zone_id()
+        active = self.coordinator.zones.get(active_id) if active_id else None
+        attrs["phase"] = rt.state
+        attrs["label"] = active.name if active else (
+            "Backwash" if rt.state in (STATE_BACKWASH, STATE_BACKWASH_PRESSURE) else "—"
+        )
+        return attrs
+
+
+class QueueRemainingSensor(IrrigationBaseEntity, SensorEntity):
+    """Total watering time left for the whole queue (pauses during backwash)."""
+
+    _attr_icon = "mdi:timer-outline"
+
+    def __init__(self, coordinator: IrrigationCoordinator) -> None:
+        super().__init__(coordinator, "queue_remaining", "Queue time remaining")
+
+    @property
+    def native_value(self) -> str:
+        return _fmt_hms(self.coordinator.queue_remaining_seconds())
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = _hms_attrs(self.coordinator.queue_remaining_seconds())
+        attrs["queue_length"] = len(self.coordinator.rt.queue)
+        attrs["paused_for_backwash"] = self.coordinator.rt.state in (
+            STATE_BACKWASH,
+            STATE_BACKWASH_PRESSURE,
+        )
+        return attrs

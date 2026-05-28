@@ -132,6 +132,51 @@ class IrrigationCoordinator:
             return self.rt.queue[0]
         return None
 
+    def _zone_full_seconds(self, zone_id: str) -> int:
+        zone = self.zones.get(zone_id)
+        if not zone:
+            return 0
+        return max(1, int(round(zone.duration * self.rt.multiplier)))
+
+    def current_step_remaining_seconds(self) -> int:
+        """Seconds left in the current step.
+
+        Watering -> remaining of the active zone.
+        Backwash / pressure phases -> remaining of that phase.
+        Idle -> 0.
+        """
+        rt = self.rt
+        if rt.state == STATE_WATERING:
+            return max(0, rt.active_remaining)
+        if rt.state in (STATE_PUMP_PRESSURE, STATE_BACKWASH_PRESSURE, STATE_BACKWASH):
+            return max(0, rt.phase_remaining)
+        return 0
+
+    def queue_remaining_seconds(self) -> int:
+        """Total watering seconds left for the whole queue.
+
+        Excludes backwash time, so the value naturally pauses (stays constant)
+        while a backwash is running because the active zone's remaining time is
+        frozen during the pause.
+        """
+        rt = self.rt
+        if rt.state == STATE_IDLE or not rt.queue:
+            return 0
+        total = 0
+        # Active / first zone.
+        if rt.state == STATE_WATERING:
+            total += max(0, rt.active_remaining)
+        elif rt.active_remaining > 0:
+            # Paused mid-zone (during a backwash) — keep its remaining time.
+            total += rt.active_remaining
+        else:
+            # Not started yet (pump pressure build-up) — full duration.
+            total += self._zone_full_seconds(rt.queue[0])
+        # Remaining queued zones run their full duration.
+        for zid in rt.queue[1:]:
+            total += self._zone_full_seconds(zid)
+        return total
+
     @callback
     def _notify(self) -> None:
         async_dispatcher_send(self.hass, f"{SIGNAL_UPDATE}_{self.entry_id}")

@@ -1,11 +1,16 @@
 # Example Lovelace dashboard view for Garden Irrigation.
+#
+# TIP: instead of hand-editing this, press the "Generate dashboard YAML" button
+# the integration creates (button.garden_irrigation_generate_dashboard_yaml).
+# It produces this same layout pre-filled with your real entity_ids and zones.
+#
 # Paste under "views:" in your dashboard YAML, or use as a starting point in the
 # UI editor. Replace the example zone unique IDs with the ones you actually have
 # in `button.garden_irrigation_zone_*`.
 #
 # The cards below color buttons by status using the `extra_state_attributes`
-# exposed by each zone button (`status` = idle | queued | running) and by the
-# global status sensor.
+# exposed by each zone button (`status` = idle | queued | running), the backwash
+# button (`status` = idle | running) and the Water all button (`running`).
 
 title: Garden
 path: garden
@@ -19,6 +24,10 @@ cards:
         entities:
           - entity: sensor.garden_irrigation_status
             name: Status
+          - entity: sensor.garden_irrigation_current_step_time_remaining
+            name: Current step time remaining
+          - entity: sensor.garden_irrigation_queue_time_remaining
+            name: Queue time remaining
           - entity: sensor.garden_irrigation_active_zone
             name: Active zone
           - entity: sensor.garden_irrigation_queue
@@ -32,22 +41,42 @@ cards:
 
       - type: horizontal-stack
         cards:
-          - type: button
+          - type: custom:button-card
+            entity: button.garden_irrigation_water_all
             name: Water all / STOP
             icon: mdi:sprinkler-variant
+            show_state: false
             tap_action:
               action: perform-action
               perform_action: button.press
               target:
                 entity_id: button.garden_irrigation_water_all
-          - type: button
+            state:
+              - operator: template
+                value: >-
+                  [[[ return states['button.garden_irrigation_water_all'].attributes.running === true ]]]
+                styles:
+                  card:
+                    - background-color: '#2e7d32'
+                    - color: white
+          - type: custom:button-card
+            entity: button.garden_irrigation_backwash
             name: Backwash
             icon: mdi:backup-restore
+            show_state: false
             tap_action:
               action: perform-action
               perform_action: button.press
               target:
                 entity_id: button.garden_irrigation_backwash
+            state:
+              - operator: template
+                value: >-
+                  [[[ return states['button.garden_irrigation_backwash'].attributes.status === 'running' ]]]
+                styles:
+                  card:
+                    - background-color: '#2e7d32'
+                    - color: white
 
       - type: grid
         columns: 2

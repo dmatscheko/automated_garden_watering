@@ -2,12 +2,22 @@
 from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.components.persistent_notification import (
+    async_create as async_create_notification,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, STATE_IDLE
+from .const import (
+    DOMAIN,
+    STATE_BACKWASH,
+    STATE_BACKWASH_PRESSURE,
+    STATE_IDLE,
+)
 from .coordinator import IrrigationCoordinator
+from .dashboard import build_dashboard
 from .entity import IrrigationBaseEntity
 
 
@@ -18,6 +28,7 @@ async def async_setup_entry(
     entities: list[ButtonEntity] = [
         WaterAllButton(coordinator),
         BackwashButton(coordinator),
+        GenerateDashboardButton(coordinator),
     ]
     for zone in coordinator.zones.values():
         entities.append(ZoneToggleButton(coordinator, zone.id))
@@ -54,6 +65,56 @@ class BackwashButton(IrrigationBaseEntity, ButtonEntity):
     @property
     def available(self) -> bool:
         return self.coordinator.backwash_switch is not None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        running = self.coordinator.rt.state in (STATE_BACKWASH, STATE_BACKWASH_PRESSURE)
+        return {
+            "status": "running" if running else "idle",
+            "is_active": running,
+        }
+
+
+class GenerateDashboardButton(IrrigationBaseEntity, ButtonEntity):
+    """Generate a ready-to-paste Lovelace dashboard for this integration."""
+
+    _attr_icon = "mdi:view-dashboard-outline"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: IrrigationCoordinator) -> None:
+        super().__init__(coordinator, "generate_dashboard", "Generate dashboard YAML")
+
+    async def async_press(self) -> None:
+        yaml_text = build_dashboard(self.hass, self.coordinator)
+
+        # Best-effort: also drop a file next to configuration.yaml.
+        path = self.hass.config.path("garden_irrigation_dashboard.yaml")
+
+        def _write() -> None:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(yaml_text)
+
+        wrote = True
+        try:
+            await self.hass.async_add_executor_job(_write)
+        except Exception:  # noqa: BLE001
+            wrote = False
+
+        file_line = (
+            f"Also saved to `{path}`.\n\n" if wrote else ""
+        )
+        message = (
+            "Copy the YAML below into your dashboard's **Raw configuration editor** "
+            "(under the existing `views:` key).\n\n"
+            f"{file_line}"
+            f"```yaml\n{yaml_text}\n```"
+        )
+        async_create_notification(
+            self.hass,
+            message,
+            title="Garden Irrigation dashboard",
+            notification_id=f"{DOMAIN}_dashboard_{self.coordinator.entry_id}",
+        )
 
 
 class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
