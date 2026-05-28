@@ -27,8 +27,12 @@ A Home Assistant integration for garden irrigation with a queue-based watering c
 The setup flow asks for the pump and backwash switch (both optional), and at least one zone. After setup, use *Configure* on the integration card to:
 
 - Add / remove / reorder zones (each: switch entity, display name, default duration, run order). Delete a zone from inside its edit screen (tick *Delete this zone*).
-- Adjust the global multiplier, pump/backwash delays, the backwash reverse-flow and flush times, automatic backwash interval and end-of-queue threshold.
-- Edit the daily start time and the timer enable switch.
+- Adjust the pump/backwash delays, the backwash reverse-flow and flush times, automatic backwash interval and end-of-queue threshold.
+
+The **watering multiplier**, **daily start time** and **daily timer** are *not*
+in the config dialog — they have their own entities (`number` / `time` /
+`switch`) so you set them directly from the dashboard. Their values persist
+across restarts. This keeps each setting in exactly one place.
 
 ### Backwash sequence
 

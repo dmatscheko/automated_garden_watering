@@ -16,9 +16,6 @@ from .const import (
     CONF_BACKWASH_INTERVAL,
     CONF_BACKWASH_RUNTIME,
     CONF_BACKWASH_THRESHOLD,
-    CONF_DAILY_START,
-    CONF_DAILY_TIMER_ENABLED,
-    CONF_MULTIPLIER,
     CONF_PUMP,
     CONF_PUMP_DELAY,
     CONF_ZONE_DURATION,
@@ -32,9 +29,6 @@ from .const import (
     DEFAULT_BACKWASH_INTERVAL,
     DEFAULT_BACKWASH_RUNTIME,
     DEFAULT_BACKWASH_THRESHOLD,
-    DEFAULT_DAILY_START,
-    DEFAULT_DAILY_TIMER_ENABLED,
-    DEFAULT_MULTIPLIER,
     DEFAULT_PUMP_DELAY,
     DEFAULT_ZONE_DURATION,
     DOMAIN,
@@ -62,12 +56,6 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Optional(
                 CONF_BACKWASH, description={"suggested_value": defaults.get(CONF_BACKWASH)}
             ): OPTIONAL_SWITCH_SELECTOR,
-            vol.Required(
-                CONF_MULTIPLIER,
-                default=defaults.get(CONF_MULTIPLIER, DEFAULT_MULTIPLIER),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=0.0, max=10.0, step=0.05, mode="box")
-            ),
             vol.Required(
                 CONF_PUMP_DELAY,
                 default=defaults.get(CONF_PUMP_DELAY, DEFAULT_PUMP_DELAY),
@@ -118,16 +106,10 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
                     min=0, max=24 * 3600, step=10, mode="box", unit_of_measurement="s"
                 )
             ),
-            vol.Required(
-                CONF_DAILY_START,
-                default=defaults.get(CONF_DAILY_START, DEFAULT_DAILY_START),
-            ): selector.TimeSelector(),
-            vol.Required(
-                CONF_DAILY_TIMER_ENABLED,
-                default=defaults.get(
-                    CONF_DAILY_TIMER_ENABLED, DEFAULT_DAILY_TIMER_ENABLED
-                ),
-            ): selector.BooleanSelector(),
+            # NOTE: watering multiplier, daily start time and daily timer are
+            # intentionally NOT here — they are editable as their own entities
+            # (number / time / switch), so duplicating them in this dialog would
+            # be confusing. Their values still persist via those entities.
         }
     )
 

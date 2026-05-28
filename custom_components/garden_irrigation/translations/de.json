@@ -7,28 +7,22 @@
         "data": {
           "pump_switch": "Brunnenpumpen-Schalter (optional)",
           "backwash_switch": "Rückspülventil-Schalter (optional)",
-          "multiplier": "Globaler Bewässerungs-Multiplikator",
           "pump_pressure_delay": "Pumpen-Druckaufbau-Verzögerung (Sekunden)",
           "backwash_pressure_delay": "Rückspül-Druckaufbau-Verzögerung (Sekunden)",
           "backwash_runtime": "Rückspül-Rückflusszeit (Sekunden, Pumpe AUS)",
           "backwash_flush_runtime": "Rückspül-Spülzeit (Sekunden, Pumpe AN)",
           "backwash_interval": "Automatisches Rückspül-Intervall — Sekunden kumulierter Bewässerung zwischen automatischen Rückspülungen (0 = aus)",
-          "backwash_threshold": "Rückspül-Schwelle am Warteschlangen-Ende — Mindestsekunden Gesamtbewässerung, bevor am Ende eine Rückspülung läuft",
-          "daily_start": "Tägliche Startzeit der Bewässerung",
-          "daily_timer_enabled": "Tages-Timer aktivieren"
+          "backwash_threshold": "Rückspül-Schwelle am Warteschlangen-Ende — Mindestsekunden Gesamtbewässerung, bevor am Ende eine Rückspülung läuft"
         },
         "data_description": {
           "pump_switch": "Die Home-Assistant-Schalter-Entität, die deine Brunnenpumpe steuert. Wird eingeschaltet, bevor ein Ventil öffnet.",
           "backwash_switch": "Die Home-Assistant-Schalter-Entität für das Rückspülventil. Bleibt sie leer, ist die gesamte Rückspül-Funktion deaktiviert.",
-          "multiplier": "Multipliziert die Standarddauer jeder Zone (z. B. 2,5 = 2,5× länger).",
           "pump_pressure_delay": "Wartezeit nach dem Einschalten der Pumpe, bevor ein Ventil geöffnet wird. Läuft einmal zu Beginn einer Warteschlange.",
           "backwash_pressure_delay": "Zeit zum Druckaufbau (Pumpe an, Ventile zu), bevor die Rückspülung startet.",
           "backwash_runtime": "Rückfluss-Phase: Die Pumpe wird AUSgeschaltet und das Rückspülventil geöffnet, sodass Wasser rückwärts durch den Filter fließt und den Schmutz löst.",
           "backwash_flush_runtime": "Spül-Phase: Die Pumpe wird wieder EINgeschaltet (Rückspülventil bleibt offen), um den gelösten Schmutz herauszuspülen.",
           "backwash_interval": "Nach so vielen Sekunden kumulierter Bewässerung pausiert die Steuerung die Bewässerung, führt eine Rückspülung durch und setzt dann fort.",
-          "backwash_threshold": "Wenn eine Warteschlange endet, läuft eine abschließende Rückspülung, sofern mindestens so viel bewässert wurde (oder die Warteschlange vom Timer gestartet wurde).",
-          "daily_start": "Uhrzeit, zu der „Alles bewässern“ automatisch startet.",
-          "daily_timer_enabled": "Wenn an, löst der Tages-Timer aus; wenn aus, passiert nichts."
+          "backwash_threshold": "Wenn eine Warteschlange endet, läuft eine abschließende Rückspülung, sofern mindestens so viel bewässert wurde (oder die Warteschlange vom Timer gestartet wurde)."
         }
       },
       "zone": {
@@ -63,7 +57,7 @@
         "title": "Gartenbewässerung",
         "description": "Globale Einstellungen bearbeiten oder Zonen verwalten.",
         "menu_options": {
-          "globals": "Globale Einstellungen (Zeiten, Multiplikator, Tages-Timer)",
+          "globals": "Globale Einstellungen (Pumpe, Rückspülung, Zeiten)",
           "zones_list": "Zonen (hinzufügen, bearbeiten, löschen, umsortieren)"
         }
       },
@@ -72,28 +66,22 @@
         "data": {
           "pump_switch": "Brunnenpumpen-Schalter (optional)",
           "backwash_switch": "Rückspülventil-Schalter (optional)",
-          "multiplier": "Globaler Bewässerungs-Multiplikator",
           "pump_pressure_delay": "Pumpen-Druckaufbau-Verzögerung (Sekunden)",
           "backwash_pressure_delay": "Rückspül-Druckaufbau-Verzögerung (Sekunden)",
           "backwash_runtime": "Rückspül-Rückflusszeit (Sekunden, Pumpe AUS)",
           "backwash_flush_runtime": "Rückspül-Spülzeit (Sekunden, Pumpe AN)",
           "backwash_interval": "Automatisches Rückspül-Intervall (Sekunden, 0 = aus)",
-          "backwash_threshold": "Rückspül-Schwelle am Warteschlangen-Ende (Sekunden)",
-          "daily_start": "Tägliche Startzeit der Bewässerung",
-          "daily_timer_enabled": "Tages-Timer aktivieren"
+          "backwash_threshold": "Rückspül-Schwelle am Warteschlangen-Ende (Sekunden)"
         },
         "data_description": {
           "pump_switch": "Schalter, der vor dem Öffnen jedes Ventils eingeschaltet wird.",
           "backwash_switch": "Rückspülventil-Schalter. Leer lassen, um die Rückspülung zu deaktivieren.",
-          "multiplier": "Multipliziert die Standarddauer jeder Zone.",
           "pump_pressure_delay": "So lange nach dem Einschalten der Pumpe warten, bevor ein Ventil geöffnet wird.",
           "backwash_pressure_delay": "So lange Druck aufbauen (Pumpe an, Ventile zu), bevor die Rückspülung startet.",
           "backwash_runtime": "Rückfluss-Phase: Pumpe AUS, Rückspülventil offen — Wasser fließt rückwärts und löst den Schmutz.",
           "backwash_flush_runtime": "Spül-Phase: Pumpe wieder AN, Rückspülventil noch offen — spült den gelösten Schmutz heraus.",
           "backwash_interval": "Automatisch eine Rückspülung nach so viel kumulierter Bewässerung. 0 deaktiviert dies.",
-          "backwash_threshold": "Abschließende Rückspülung nur, wenn mindestens so viel bewässert wurde (oder die Warteschlange vom Timer gestartet wurde).",
-          "daily_start": "Wann der Tages-Timer auslöst.",
-          "daily_timer_enabled": "Ob der Tages-Timer aktiv ist."
+          "backwash_threshold": "Abschließende Rückspülung nur, wenn mindestens so viel bewässert wurde (oder die Warteschlange vom Timer gestartet wurde)."
         }
       },
       "zones_list": {

@@ -7,28 +7,22 @@
         "data": {
           "pump_switch": "Well pump switch (optional)",
           "backwash_switch": "Backwash valve switch (optional)",
-          "multiplier": "Global watering multiplier",
           "pump_pressure_delay": "Pump pressure build-up delay (seconds)",
           "backwash_pressure_delay": "Backwash pressure build-up delay (seconds)",
           "backwash_runtime": "Backwash reverse-flow time (seconds, pump OFF)",
           "backwash_flush_runtime": "Backwash flush time (seconds, pump ON)",
           "backwash_interval": "Automatic backwash interval — seconds of cumulative watering between automatic backwashes (0 = off)",
-          "backwash_threshold": "End-of-queue backwash threshold — minimum seconds of total watering before an end-of-queue backwash runs",
-          "daily_start": "Daily watering start time",
-          "daily_timer_enabled": "Enable daily timer"
+          "backwash_threshold": "End-of-queue backwash threshold — minimum seconds of total watering before an end-of-queue backwash runs"
         },
         "data_description": {
           "pump_switch": "The Home Assistant switch entity that controls your well pump. Will be turned on before any valve opens.",
           "backwash_switch": "The Home Assistant switch entity for the backwash valve. If empty, all backwash behavior is disabled.",
-          "multiplier": "Multiplies every zone's default duration (e.g. 2.5 = 2.5× longer).",
           "pump_pressure_delay": "Time to wait after turning on the pump and before opening a valve. Runs once at the start of a queue.",
           "backwash_pressure_delay": "Time to build up pressure (pump on, valves closed) before the backwash starts.",
           "backwash_runtime": "Reverse-flow phase: the pump is turned OFF and the backwash valve opened, so water flows backwards through the filter and dislodges the dirt.",
           "backwash_flush_runtime": "Flush phase: the pump is turned back ON (backwash valve still open) to flush the dislodged dirt out.",
           "backwash_interval": "After this many seconds of cumulative watering, the controller pauses watering and runs a backwash, then resumes.",
-          "backwash_threshold": "When a queue finishes, run a final backwash if at least this much watering happened (or if the queue was started by the timer).",
-          "daily_start": "Time of day to automatically start 'Water all'.",
-          "daily_timer_enabled": "If on, the daily timer fires; if off, the timer does nothing."
+          "backwash_threshold": "When a queue finishes, run a final backwash if at least this much watering happened (or if the queue was started by the timer)."
         }
       },
       "zone": {
@@ -63,7 +57,7 @@
         "title": "Garden Irrigation",
         "description": "Edit global settings or manage zones.",
         "menu_options": {
-          "globals": "Global settings (timings, multiplier, daily timer)",
+          "globals": "Global settings (pump, backwash, timings)",
           "zones_list": "Zones (add, edit, delete, reorder)"
         }
       },
@@ -72,28 +66,22 @@
         "data": {
           "pump_switch": "Well pump switch (optional)",
           "backwash_switch": "Backwash valve switch (optional)",
-          "multiplier": "Global watering multiplier",
           "pump_pressure_delay": "Pump pressure build-up delay (seconds)",
           "backwash_pressure_delay": "Backwash pressure build-up delay (seconds)",
           "backwash_runtime": "Backwash reverse-flow time (seconds, pump OFF)",
           "backwash_flush_runtime": "Backwash flush time (seconds, pump ON)",
           "backwash_interval": "Automatic backwash interval (seconds, 0 = off)",
-          "backwash_threshold": "End-of-queue backwash threshold (seconds)",
-          "daily_start": "Daily watering start time",
-          "daily_timer_enabled": "Enable daily timer"
+          "backwash_threshold": "End-of-queue backwash threshold (seconds)"
         },
         "data_description": {
           "pump_switch": "Switch turned on before any valve opens.",
           "backwash_switch": "Backwash valve switch. Leave empty to disable backwash.",
-          "multiplier": "Multiplies every zone's default duration.",
           "pump_pressure_delay": "Wait this long after the pump comes on before opening a valve.",
           "backwash_pressure_delay": "Build up pressure (pump on, valves closed) for this long before the backwash starts.",
           "backwash_runtime": "Reverse-flow phase: pump OFF, backwash valve open — water flows backwards and dislodges the dirt.",
           "backwash_flush_runtime": "Flush phase: pump back ON, backwash valve still open — flushes the dislodged dirt out.",
           "backwash_interval": "Run a backwash automatically after this much cumulative watering. 0 disables it.",
-          "backwash_threshold": "Final backwash runs only if at least this much watering happened (or if the queue was timer-started).",
-          "daily_start": "When the daily timer fires.",
-          "daily_timer_enabled": "Whether the daily timer is active."
+          "backwash_threshold": "Final backwash runs only if at least this much watering happened (or if the queue was timer-started)."
         }
       },
       "zones_list": {
