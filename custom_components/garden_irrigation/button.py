@@ -62,12 +62,12 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
     def __init__(self, coordinator: IrrigationCoordinator, zone_id: str) -> None:
         zone = coordinator.zones[zone_id]
         # Friendly name = the user-supplied display name (updates dynamically
-        # via the `name` property below). entity_id is forced to use the run
-        # order so buttons sort naturally when picked in the UI.
+        # via the `name` property below). HA generates the natural
+        # button.<device>_<name> id; __init__.py then renames it to
+        # button.<device>_zone_<order> so the buttons sort by run order.
         # unique_id stays uuid-based so the entity survives renames/reorders.
         super().__init__(coordinator, f"zone_{zone_id}", zone.name)
         self._zone_id = zone_id
-        self.entity_id = f"button.garden_irrigation_zone_{zone.order}"
 
     @property
     def name(self) -> str:
