@@ -68,6 +68,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
     multiplier = _resolve(hass, entry_id, "multiplier", "number")
     daily_start = _resolve(hass, entry_id, "daily_start", "time")
     daily_timer = _resolve(hass, entry_id, "daily_timer", "switch")
+    manual_pump = _resolve(hass, entry_id, "manual_pump", "switch")
 
     # Entities card (drop any that couldn't be resolved).
     entity_rows = [
@@ -79,6 +80,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         (multiplier, "Watering multiplier"),
         (daily_start, "Daily start time"),
         (daily_timer, "Daily timer"),
+        (manual_pump, "Pump (manual)"),
     ]
     entities_card = {
         "type": "entities",
@@ -134,7 +136,8 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             "if (a.status === 'running') { const s = Math.max(0, a.remaining_seconds || 0); "
             "return 'Running ' + Math.floor(s/60) + ':' + ('0'+(s%60)).slice(-2); } "
             "if (a.status === 'queued') return 'Queued #' + a.queue_position; "
-            "return ''; ]]]"
+            "if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly; "
+            "return 'Never run'; ]]]"
         )
         zone_cards.append(
             _button_card(

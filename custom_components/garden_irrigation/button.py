@@ -151,6 +151,7 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
             status = "running"
         elif position is not None:
             status = "queued"
+        last_run = self.coordinator.zone_last_run(self._zone_id)
         return {
             "zone_name": zone.name,
             "default_duration_seconds": zone.duration,
@@ -159,4 +160,6 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
             "is_active": is_active,
             "status": status,
             "remaining_seconds": rt.active_remaining if is_active else None,
+            "last_run": last_run.isoformat() if last_run else None,
+            "last_run_friendly": self.coordinator.zone_last_run_friendly(self._zone_id),
         }

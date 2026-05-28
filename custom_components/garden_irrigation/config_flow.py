@@ -38,6 +38,10 @@ from .const import (
     DOMAIN,
 )
 
+# Transient form-only field (not persisted) used to delete a zone from its
+# edit screen instead of from the zone list.
+CONF_ZONE_DELETE = "delete_zone"
+
 SWITCH_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="switch")
 )
@@ -116,34 +120,40 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
     )
 
 
-def _zone_schema(zone: dict[str, Any] | None, next_order: int) -> vol.Schema:
+def _zone_schema(
+    zone: dict[str, Any] | None, next_order: int, allow_delete: bool = False
+) -> vol.Schema:
     zone = zone or {}
-    return vol.Schema(
-        {
-            vol.Required(
-                CONF_ZONE_NAME,
-                default=zone.get(CONF_ZONE_NAME, "Zone"),
-            ): selector.TextSelector(),
-            vol.Required(
-                CONF_ZONE_ENTITY,
-                description={"suggested_value": zone.get(CONF_ZONE_ENTITY)},
-            ): SWITCH_SELECTOR,
-            vol.Required(
-                CONF_ZONE_DURATION,
-                default=zone.get(CONF_ZONE_DURATION, DEFAULT_ZONE_DURATION),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1, max=24 * 3600, step=1, mode="box", unit_of_measurement="s"
-                )
-            ),
-            vol.Required(
-                CONF_ZONE_ORDER,
-                default=zone.get(CONF_ZONE_ORDER, next_order),
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=0, max=999, step=1, mode="box")
-            ),
-        }
-    )
+    schema: dict[Any, Any] = {
+        vol.Required(
+            CONF_ZONE_NAME,
+            default=zone.get(CONF_ZONE_NAME, "Zone"),
+        ): selector.TextSelector(),
+        vol.Required(
+            CONF_ZONE_ENTITY,
+            description={"suggested_value": zone.get(CONF_ZONE_ENTITY)},
+        ): SWITCH_SELECTOR,
+        vol.Required(
+            CONF_ZONE_DURATION,
+            default=zone.get(CONF_ZONE_DURATION, DEFAULT_ZONE_DURATION),
+        ): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=1, max=24 * 3600, step=1, mode="box", unit_of_measurement="s"
+            )
+        ),
+        vol.Required(
+            CONF_ZONE_ORDER,
+            default=zone.get(CONF_ZONE_ORDER, next_order),
+        ): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=0, max=999, step=1, mode="box")
+        ),
+    }
+    if allow_delete:
+        # Shown only when editing an existing zone. Tick + submit to remove it.
+        schema[vol.Required(CONF_ZONE_DELETE, default=False)] = (
+            selector.BooleanSelector()
+        )
+    return vol.Schema(schema)
 
 
 class GardenIrrigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -236,20 +246,23 @@ class GardenIrrigationOptionsFlow(config_entries.OptionsFlow):
             choice = user_input.get("action")
             if choice == "__add__":
                 return await self.async_step_zone_edit()
-            if choice and choice.startswith("delete:"):
-                zid = choice.split(":", 1)[1]
-                self._zones = [z for z in self._zones if z[CONF_ZONE_ID] != zid]
-                return await self._save_and_exit()
             if choice and choice.startswith("edit:"):
                 self._edit_zone_id = choice.split(":", 1)[1]
                 return await self.async_step_zone_edit()
             return await self._save_and_exit()
 
+        # Only edit selections are shown. Deleting a zone is done from inside its
+        # edit screen, so an accidental tap here can never remove a zone.
         options = [{"value": "__add__", "label": "➕ Add a new zone"}]
-        for z in sorted(self._zones, key=lambda x: (x.get(CONF_ZONE_ORDER, 0), x.get(CONF_ZONE_NAME, ""))):
-            label = f"#{z.get(CONF_ZONE_ORDER, '?')} — {z.get(CONF_ZONE_NAME)} ({z.get(CONF_ZONE_ENTITY)})"
-            options.append({"value": f"edit:{z[CONF_ZONE_ID]}", "label": f"✏️ Edit: {label}"})
-            options.append({"value": f"delete:{z[CONF_ZONE_ID]}", "label": f"🗑 Delete: {label}"})
+        for z in sorted(
+            self._zones,
+            key=lambda x: (x.get(CONF_ZONE_ORDER, 0), x.get(CONF_ZONE_NAME, "")),
+        ):
+            label = (
+                f"#{z.get(CONF_ZONE_ORDER, '?')} — {z.get(CONF_ZONE_NAME)} "
+                f"({z.get(CONF_ZONE_ENTITY)})"
+            )
+            options.append({"value": f"edit:{z[CONF_ZONE_ID]}", "label": label})
 
         return self.async_show_form(
             step_id="zones_list",
@@ -273,6 +286,13 @@ class GardenIrrigationOptionsFlow(config_entries.OptionsFlow):
                     break
 
         if user_input is not None:
+            delete = user_input.pop(CONF_ZONE_DELETE, False)
+            if existing and delete:
+                self._zones = [
+                    z for z in self._zones if z[CONF_ZONE_ID] != self._edit_zone_id
+                ]
+                self._edit_zone_id = None
+                return await self._save_and_exit()
             if existing:
                 existing.update(user_input)
             else:
@@ -285,7 +305,9 @@ class GardenIrrigationOptionsFlow(config_entries.OptionsFlow):
         next_order = max([z.get(CONF_ZONE_ORDER, 0) for z in self._zones] or [0]) + 1
         return self.async_show_form(
             step_id="zone_edit",
-            data_schema=_zone_schema(existing, next_order=next_order),
+            data_schema=_zone_schema(
+                existing, next_order=next_order, allow_delete=existing is not None
+            ),
         )
 
     async def _save_and_exit(self):

@@ -11,6 +11,8 @@ from homeassistant.const import SERVICE_TURN_OFF, SERVICE_TURN_ON
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_BACKWASH,
@@ -48,6 +50,8 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+STORAGE_VERSION = 1
+
 
 @dataclass
 class Zone:
@@ -82,6 +86,8 @@ class IrrigationCoordinator:
         self._tick_unsub: CALLBACK_TYPE | None = None
         self._daily_unsub: CALLBACK_TYPE | None = None
         self.rt = RuntimeState()
+        self._store: Store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
+        self.last_run: dict[str, datetime] = {}
         self._reload_config(data)
 
     # ---------- configuration ----------
@@ -201,10 +207,45 @@ class IrrigationCoordinator:
     async def async_start(self) -> None:
         from homeassistant.helpers.event import async_track_time_interval
 
+        stored = await self._store.async_load()
+        if stored and isinstance(stored.get("last_run"), dict):
+            for zid, iso in stored["last_run"].items():
+                parsed = dt_util.parse_datetime(iso)
+                if parsed:
+                    self.last_run[zid] = parsed
+
         self._tick_unsub = async_track_time_interval(
             self.hass, self._on_tick, timedelta(seconds=1)
         )
         self._reschedule_daily_timer()
+
+    @callback
+    def _persist_last_run(self) -> None:
+        self._store.async_delay_save(
+            lambda: {
+                "last_run": {zid: dt.isoformat() for zid, dt in self.last_run.items()}
+            },
+            2,
+        )
+
+    def zone_last_run(self, zone_id: str) -> datetime | None:
+        return self.last_run.get(zone_id)
+
+    def zone_last_run_friendly(self, zone_id: str) -> str | None:
+        """Human friendly 'Today 14:30' / 'Yesterday 09:00' / 'Mon 09:00' / 'May 03'."""
+        dt = self.last_run.get(zone_id)
+        if not dt:
+            return None
+        local = dt_util.as_local(dt)
+        today = dt_util.now().date()
+        delta_days = (today - local.date()).days
+        if delta_days <= 0:
+            return f"Today {local:%H:%M}"
+        if delta_days == 1:
+            return f"Yesterday {local:%H:%M}"
+        if delta_days < 7:
+            return local.strftime("%a %H:%M")
+        return local.strftime("%b %d")
 
     async def async_stop(self) -> None:
         if self._tick_unsub:
@@ -342,6 +383,9 @@ class IrrigationCoordinator:
         # If we're resuming a paused zone, active_remaining is already > 0 — keep it.
         if rt.active_remaining <= 0:
             rt.active_remaining = max(1, int(round(zone.duration * rt.multiplier)))
+            # Fresh start of this zone (not a backwash resume) -> record last run.
+            self.last_run[zone.id] = dt_util.now()
+            self._persist_last_run()
         await self._switch(zone.entity_id, True)
         rt.state = STATE_WATERING
 
@@ -448,6 +492,24 @@ class IrrigationCoordinator:
                 rt.pending_backwash = False
                 await self._enter_backwash_pressure(triggered_during_run=False)
         self._notify()
+
+    async def async_manual_pump(self, on: bool) -> bool:
+        """Manually drive the pump. Returns False if the request was refused.
+
+        Turning the pump off is refused while a queue/backwash is active so the
+        safety invariant (pump on before any valve) cannot be broken manually.
+        """
+        if not self.pump_switch:
+            return False
+        if not on and self.rt.state != STATE_IDLE:
+            _LOGGER.warning(
+                "Refusing manual pump-off while irrigation is active (state=%s)",
+                self.rt.state,
+            )
+            return False
+        await self._switch(self.pump_switch, on)
+        self._notify()
+        return True
 
     async def async_set_multiplier(self, value: float) -> None:
         self.multiplier = max(0.0, float(value))

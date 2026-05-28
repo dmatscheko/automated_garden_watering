@@ -38,6 +38,8 @@ cards:
             name: Daily start time
           - entity: switch.garden_irrigation_daily_timer
             name: Daily timer
+          - entity: switch.garden_irrigation_pump_manual
+            name: Pump (manual)
 
       - type: horizontal-stack
         cards:
@@ -114,7 +116,8 @@ cards:
                 const a = states['button.garden_irrigation_zone_REPLACE_ME'].attributes;
                 if (a.status === 'running') return 'Running · ' + Math.max(0, a.remaining_seconds || 0) + 's left';
                 if (a.status === 'queued') return 'Queued #' + a.queue_position;
-                return 'Idle';
+                if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly;
+                return 'Never run';
               ]]]
 
 # Notes

@@ -31,11 +31,6 @@ async def async_setup_entry(
     )
 
 
-def _fmt_mmss(seconds: int) -> str:
-    seconds = max(0, int(seconds))
-    return f"{seconds // 60:02d}:{seconds % 60:02d}"
-
-
 def _fmt_hms(seconds: int) -> str:
     seconds = max(0, int(seconds))
     return f"{seconds // 3600:d}:{(seconds % 3600) // 60:02d}:{seconds % 60:02d}"
@@ -64,6 +59,10 @@ class StatusSensor(IrrigationBaseEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
+        # Only slow-changing attributes here. The per-second countdown values
+        # live on the dedicated "*_time_remaining" sensors so this entity's
+        # state/attributes stay stable between transitions and don't flood the
+        # recorder with a new row every second.
         rt = self.coordinator.rt
         active_id = self.coordinator.active_zone_id()
         active = self.coordinator.zones.get(active_id) if active_id else None
@@ -77,12 +76,6 @@ class StatusSensor(IrrigationBaseEntity, SensorEntity):
             "queue": queue_names,
             "queue_length": len(rt.queue),
             "active_zone": active.name if active else None,
-            "active_remaining_seconds": rt.active_remaining,
-            "active_remaining_mmss": _fmt_mmss(rt.active_remaining),
-            "phase_remaining_seconds": rt.phase_remaining,
-            "phase_remaining_mmss": _fmt_mmss(rt.phase_remaining),
-            "accumulated_watering_seconds": rt.accumulated_watering,
-            "since_last_backwash_seconds": rt.since_last_backwash,
             "multiplier": self.coordinator.multiplier,
             "started_by_timer": rt.started_by_timer,
         }
@@ -101,13 +94,8 @@ class ActiveZoneSensor(IrrigationBaseEntity, SensorEntity):
             return self.coordinator.zones[active_id].name
         return "none"
 
-    @property
-    def extra_state_attributes(self) -> dict:
-        rt = self.coordinator.rt
-        return {
-            "remaining_seconds": rt.active_remaining,
-            "remaining_mmss": _fmt_mmss(rt.active_remaining),
-        }
+    # No per-second attributes: state is the zone name, which only changes when
+    # the active zone changes. Remaining time is on the step-remaining sensor.
 
 
 class QueueSensor(IrrigationBaseEntity, SensorEntity):

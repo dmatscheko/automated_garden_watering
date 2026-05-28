@@ -94,7 +94,7 @@
       },
       "zones_list": {
         "title": "Zones",
-        "description": "Pick a zone to edit/delete or add a new one. To reorder, edit a zone and change its 'Run order' number.",
+        "description": "Pick a zone to edit, or add a new one. To reorder, edit a zone and change its 'Run order' number. To remove a zone, open it and tick 'Delete this zone'.",
         "data": {"action": "Action"}
       },
       "zone_edit": {
@@ -103,13 +103,15 @@
           "name": "Display name",
           "entity_id": "Zone valve switch",
           "duration": "Default watering duration (seconds)",
-          "order": "Run order for 'Water all' (lower runs first)"
+          "order": "Run order for 'Water all' (lower runs first)",
+          "delete_zone": "Delete this zone"
         },
         "data_description": {
           "name": "Friendly name shown in the dashboard.",
           "entity_id": "Home Assistant switch entity for this zone's valve.",
           "duration": "Default seconds; effective time = duration × multiplier.",
-          "order": "Smaller numbers run earlier."
+          "order": "Smaller numbers run earlier.",
+          "delete_zone": "Tick this and press Submit to permanently remove this zone. Leave unticked to save your edits."
         }
       }
     }
