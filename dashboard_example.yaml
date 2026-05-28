@@ -18,30 +18,8 @@ icon: mdi:sprinkler
 cards:
   - type: vertical-stack
     cards:
-      - type: entities
-        title: Garden Irrigation
-        show_header_toggle: false
-        entities:
-          - entity: sensor.garden_irrigation_status
-            name: Status
-          - entity: sensor.garden_irrigation_current_step_time_remaining
-            name: Current step time remaining
-          - entity: sensor.garden_irrigation_queue_time_remaining
-            name: Queue time remaining
-          - entity: sensor.garden_irrigation_active_zone
-            name: Active zone
-          - entity: sensor.garden_irrigation_queue
-            name: Queue
-          - entity: number.garden_irrigation_watering_multiplier
-            name: Watering multiplier
-          - entity: time.garden_irrigation_daily_start_time
-            name: Daily start time
-          - entity: switch.garden_irrigation_daily_timer
-            name: Daily timer
-
-      # All buttons share one 2-column grid, so the global actions (Water all,
-      # Backwash, Pump) are the same full size as the zone buttons and have room
-      # for their last-run labels. Their icons keep them distinct.
+      # Row 1: Water all + Details. Tapping Details reveals the status list below
+      # (the global actions and zones stay the same full size in a second grid).
       - type: grid
         columns: 2
         square: false
@@ -64,6 +42,52 @@ cards:
                   card:
                     - background-color: '#2e7d32'
                     - color: white
+          - type: custom:button-card
+            entity: switch.garden_irrigation_show_details
+            name: Details
+            icon: mdi:information-outline
+            show_state: false
+            tap_action:
+              action: toggle
+            state:
+              - value: 'on'
+                styles:
+                  card:
+                    - background-color: '#2e7d32'
+                    - color: white
+
+      # Hidden by default; revealed when "Details" (the Show details switch) is on.
+      - type: conditional
+        conditions:
+          - entity: switch.garden_irrigation_show_details
+            state: 'on'
+        card:
+          type: entities
+          title: Garden Irrigation
+          show_header_toggle: false
+          entities:
+            - entity: sensor.garden_irrigation_status
+              name: Status
+            - entity: sensor.garden_irrigation_current_step_time_remaining
+              name: Current step time remaining
+            - entity: sensor.garden_irrigation_queue_time_remaining
+              name: Queue time remaining
+            - entity: sensor.garden_irrigation_active_zone
+              name: Active zone
+            - entity: sensor.garden_irrigation_queue
+              name: Queue
+            - entity: number.garden_irrigation_watering_multiplier
+              name: Watering multiplier
+            - entity: time.garden_irrigation_daily_start_time
+              name: Daily start time
+            - entity: switch.garden_irrigation_daily_timer
+              name: Daily timer
+
+      # Remaining buttons, same full size: Backwash, Pump, then the zones.
+      - type: grid
+        columns: 2
+        square: false
+        cards:
           - type: custom:button-card
             entity: button.garden_irrigation_backwash
             name: Backwash

@@ -69,6 +69,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
     daily_start = _resolve(hass, entry_id, "daily_start", "time")
     daily_timer = _resolve(hass, entry_id, "daily_timer", "switch")
     manual_pump = _resolve(hass, entry_id, "manual_pump", "switch")
+    details = _resolve(hass, entry_id, "details_visible", "switch")
 
     # Entities card (drop any that couldn't be resolved).
     entity_rows = [
@@ -90,23 +91,39 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         ],
     }
 
-    # Action buttons.
-    action_cards: list[dict[str, Any]] = []
-    if water_all:
-        action_cards.append(
-            _button_card(
-                water_all,
-                "Water all / STOP",
-                "mdi:sprinkler-variant",
-                [
-                    {
-                        "operator": "template",
-                        "value": f"[[[ return states['{water_all}'].attributes.running === true ]]]",
-                        "styles": _styled(GREEN),
-                    }
-                ],
-            )
+    # --- Action buttons (built individually so we can place them precisely) ---
+    water_all_card = (
+        _button_card(
+            water_all,
+            "Water all / STOP",
+            "mdi:sprinkler-variant",
+            [
+                {
+                    "operator": "template",
+                    "value": f"[[[ return states['{water_all}'].attributes.running === true ]]]",
+                    "styles": _styled(GREEN),
+                }
+            ],
         )
+        if water_all
+        else None
+    )
+
+    details_card = (
+        {
+            "type": "custom:button-card",
+            "entity": details,
+            "name": "Details",
+            "icon": "mdi:information-outline",
+            "show_state": False,
+            "tap_action": {"action": "toggle"},
+            "state": [{"value": "on", "styles": _styled(GREEN)}],
+        }
+        if details
+        else None
+    )
+
+    backwash_card = None
     if backwash:
         backwash_label = (
             f"[[[ const a = states['{backwash}'].attributes; "
@@ -114,21 +131,21 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             "if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly; "
             "return 'Never run'; ]]]"
         )
-        action_cards.append(
-            _button_card(
-                backwash,
-                "Backwash",
-                "mdi:backup-restore",
-                [
-                    {
-                        "operator": "template",
-                        "value": f"[[[ return states['{backwash}'].attributes.status === 'running' ]]]",
-                        "styles": _styled(GREEN),
-                    }
-                ],
-                label=backwash_label,
-            )
+        backwash_card = _button_card(
+            backwash,
+            "Backwash",
+            "mdi:backup-restore",
+            [
+                {
+                    "operator": "template",
+                    "value": f"[[[ return states['{backwash}'].attributes.status === 'running' ]]]",
+                    "styles": _styled(GREEN),
+                }
+            ],
+            label=backwash_label,
         )
+
+    pump_card = None
     if manual_pump:
         # The manual pump is a switch -> tap toggles it. Styled like the zone
         # buttons: green while on, with a "last run" line when off.
@@ -138,19 +155,17 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             "if (e.attributes.last_run_friendly) return 'Last: ' + e.attributes.last_run_friendly; "
             "return 'Never run'; ]]]"
         )
-        action_cards.append(
-            {
-                "type": "custom:button-card",
-                "entity": manual_pump,
-                "name": "Pump (manual)",
-                "icon": "mdi:water-pump",
-                "show_state": False,
-                "show_label": True,
-                "tap_action": {"action": "toggle"},
-                "state": [{"value": "on", "styles": _styled(GREEN)}],
-                "label": pump_label,
-            }
-        )
+        pump_card = {
+            "type": "custom:button-card",
+            "entity": manual_pump,
+            "name": "Pump (manual)",
+            "icon": "mdi:water-pump",
+            "show_state": False,
+            "show_label": True,
+            "tap_action": {"action": "toggle"},
+            "state": [{"value": "on", "styles": _styled(GREEN)}],
+            "label": pump_label,
+        }
 
     # Zone buttons in run order, colored by status with a live countdown label.
     zone_cards: list[dict[str, Any]] = []
@@ -188,15 +203,35 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             )
         )
 
-    # All buttons share one 2-column grid so the global actions are the same
-    # (full) size as the zone buttons and have room for their last-run labels.
-    # Their distinct icons keep them recognizable. Actions come first.
-    inner_cards: list[dict[str, Any]] = [entities_card]
-    grid_cards = action_cards + zone_cards
-    if grid_cards:
+    # Layout: a first 2-column row holds [Water all, Details]. Pressing Details
+    # toggles a conditional card that reveals the status/timer/multiplier list
+    # right below that row. Everything else (Backwash, Pump, zones) follows in a
+    # second 2-column grid, so all buttons keep the same full size.
+    def _grid(cards: list[dict[str, Any]]) -> dict[str, Any]:
+        return {"type": "grid", "columns": 2, "square": False, "cards": cards}
+
+    inner_cards: list[dict[str, Any]] = []
+
+    if details_card:
+        top_row = [c for c in (water_all_card, details_card) if c]
+        inner_cards.append(_grid(top_row))
         inner_cards.append(
-            {"type": "grid", "columns": 2, "square": False, "cards": grid_cards}
+            {
+                "type": "conditional",
+                "conditions": [{"entity": details, "state": "on"}],
+                "card": entities_card,
+            }
         )
+        rest = [c for c in (backwash_card, pump_card) if c] + zone_cards
+        if rest:
+            inner_cards.append(_grid(rest))
+    else:
+        # Fallback (no details switch): show the list, then all buttons.
+        inner_cards.append(entities_card)
+        all_buttons = [c for c in (water_all_card, backwash_card, pump_card) if c]
+        all_buttons += zone_cards
+        if all_buttons:
+            inner_cards.append(_grid(all_buttons))
 
     view = {
         "title": "Garden",

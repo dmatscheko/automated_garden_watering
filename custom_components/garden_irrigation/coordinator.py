@@ -94,6 +94,7 @@ class IrrigationCoordinator:
         self.last_run: dict[str, datetime] = {}
         self.pump_last_run: datetime | None = None
         self.backwash_last_run: datetime | None = None
+        self.details_visible: bool = False
         self._reload_config(data)
 
     # ---------- configuration ----------
@@ -235,6 +236,7 @@ class IrrigationCoordinator:
                 self.backwash_last_run = dt_util.parse_datetime(
                     stored["backwash_last_run"]
                 )
+            self.details_visible = bool(stored.get("details_visible", False))
 
         self._tick_unsub = async_track_time_interval(
             self.hass, self._on_tick, timedelta(seconds=1)
@@ -256,9 +258,16 @@ class IrrigationCoordinator:
                     if self.backwash_last_run
                     else None
                 ),
+                "details_visible": self.details_visible,
             },
             2,
         )
+
+    async def async_set_details_visible(self, value: bool) -> None:
+        """UI-only toggle for showing the details card on the dashboard."""
+        self.details_visible = bool(value)
+        self._persist_last_run()
+        self._notify()
 
     @staticmethod
     def _friendly_dt(dt: datetime | None) -> str | None:

@@ -18,7 +18,10 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator: IrrigationCoordinator = hass.data[DOMAIN][entry.entry_id]
-    entities: list[SwitchEntity] = [DailyTimerSwitch(coordinator)]
+    entities: list[SwitchEntity] = [
+        DailyTimerSwitch(coordinator),
+        DetailsSwitch(coordinator),
+    ]
     if coordinator.pump_switch:
         entities.append(ManualPumpSwitch(coordinator))
     async_add_entities(entities)
@@ -39,6 +42,29 @@ class DailyTimerSwitch(IrrigationBaseEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_daily_timer_enabled(False)
+
+
+class DetailsSwitch(IrrigationBaseEntity, SwitchEntity):
+    """UI-only toggle: reveals the details card on the dashboard.
+
+    It has no effect on irrigation; it only drives a `conditional` card so the
+    status/timer/multiplier list can be hidden behind the 'Details' button.
+    """
+
+    _attr_icon = "mdi:information-outline"
+
+    def __init__(self, coordinator: IrrigationCoordinator) -> None:
+        super().__init__(coordinator, "details_visible", "Show details")
+
+    @property
+    def is_on(self) -> bool:
+        return self.coordinator.details_visible
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_details_visible(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_details_visible(False)
 
 
 class ManualPumpSwitch(IrrigationBaseEntity, SwitchEntity):

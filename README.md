@@ -57,6 +57,7 @@ cleans the filter far better than just opening the valve:
 | `number.garden_irrigation_multiplier` | Global watering multiplier. |
 | `time.garden_irrigation_daily_start` | Daily start time. |
 | `switch.garden_irrigation_daily_timer` | Enable/disable the daily timer. |
+| `switch.garden_irrigation_show_details` | UI-only toggle (no effect on irrigation). The dashboard's *Details* button toggles it, and a `conditional` card reveals the status/timer/multiplier list while it's on. State is remembered across restarts. |
 | `sensor.garden_irrigation_status` | `idle`, `pump_pressure`, `watering`, `backwash_pressure`, `backwash` (reverse flow, pump off), `backwash_flush` (pump on). Slow-changing attributes only (queue, active zone, multiplier) so it doesn't flood the recorder. |
 | `sensor.garden_irrigation_active_zone` | Currently watering zone name (or `none`). |
 | `sensor.garden_irrigation_queue` | Comma-separated upcoming zones. |
