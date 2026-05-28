@@ -93,6 +93,7 @@ class IrrigationCoordinator:
         self._store: Store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
         self.last_run: dict[str, datetime] = {}
         self.pump_last_run: datetime | None = None
+        self.backwash_last_run: datetime | None = None
         self._reload_config(data)
 
     # ---------- configuration ----------
@@ -230,6 +231,10 @@ class IrrigationCoordinator:
                         self.last_run[zid] = parsed
             if stored.get("pump_last_run"):
                 self.pump_last_run = dt_util.parse_datetime(stored["pump_last_run"])
+            if stored.get("backwash_last_run"):
+                self.backwash_last_run = dt_util.parse_datetime(
+                    stored["backwash_last_run"]
+                )
 
         self._tick_unsub = async_track_time_interval(
             self.hass, self._on_tick, timedelta(seconds=1)
@@ -245,6 +250,11 @@ class IrrigationCoordinator:
                 },
                 "pump_last_run": (
                     self.pump_last_run.isoformat() if self.pump_last_run else None
+                ),
+                "backwash_last_run": (
+                    self.backwash_last_run.isoformat()
+                    if self.backwash_last_run
+                    else None
                 ),
             },
             2,
@@ -273,6 +283,9 @@ class IrrigationCoordinator:
 
     def pump_last_run_friendly(self) -> str | None:
         return self._friendly_dt(self.pump_last_run)
+
+    def backwash_last_run_friendly(self) -> str | None:
+        return self._friendly_dt(self.backwash_last_run)
 
     async def async_stop(self) -> None:
         if self._tick_unsub:
@@ -435,6 +448,8 @@ class IrrigationCoordinator:
                 await self._finish_queue()
             return
         # Build pressure with the pump on and all zone valves closed.
+        self.backwash_last_run = dt_util.now()
+        self._persist_last_run()
         await self._pump_on()
         await self._close_all_zone_valves()
         rt.state = STATE_BACKWASH_PRESSURE

@@ -50,7 +50,7 @@ cleans the filter far better than just opening the valve:
 | Entity | Description |
 |---|---|
 | `button.garden_irrigation_water_all` | Run all zones in order; pressing again while queue is active = emergency stop. Attribute `running` for coloring. |
-| `button.garden_irrigation_backwash` | Immediate backwash (never queued). Attribute `status` (`running`/`idle`) for coloring. |
+| `button.garden_irrigation_backwash` | Immediate backwash (never queued). Attributes `status` (`running`/`idle`) for coloring and `last_run` / `last_run_friendly` for showing when it last ran (persisted across restarts). |
 | `button.garden_irrigation_zone_<order>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<order>` suffix is the zone's run order, so the buttons sort naturally in the UI. The friendly zone name set during setup is the entity's display name and is also in the `zone_name` attribute. Attributes `last_run` (ISO) and `last_run_friendly` (e.g. `Today 14:30`, `Yesterday 09:00`, `Mon 09:00`, `May 03`) record when the zone last watered (persisted across restarts). |
 | `switch.garden_irrigation_pump_manual` | Manual well-pump control for e.g. a garden hose (only created if a pump is configured). Turning it **off** is blocked while a queue/backwash is active so the pump-first safety rule can't be broken manually. Attributes `status`, `last_run`, `last_run_friendly`, `controlled_by` (`manual`/`automation`) — so it can be shown as a button with a last-run line like the zones. |
 | `button.garden_irrigation_generate_dashboard_yaml` | Config button: generates a complete dashboard YAML for your exact entities/zones and shows it in a notification (also writes `garden_irrigation_dashboard.yaml` to your config folder). |

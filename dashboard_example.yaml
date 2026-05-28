@@ -64,6 +64,7 @@ cards:
             name: Backwash
             icon: mdi:backup-restore
             show_state: false
+            show_label: true
             tap_action:
               action: perform-action
               perform_action: button.press
@@ -77,6 +78,13 @@ cards:
                   card:
                     - background-color: '#2e7d32'
                     - color: white
+            label: >-
+              [[[
+                const a = states['button.garden_irrigation_backwash'].attributes;
+                if (a.status === 'running') return 'Running';
+                if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly;
+                return 'Never run';
+              ]]]
           # Manual pump is a switch -> tap toggles it. Green while on, with a
           # "last run" line when off (like the zone buttons).
           - type: custom:button-card

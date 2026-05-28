@@ -108,6 +108,12 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             )
         )
     if backwash:
+        backwash_label = (
+            f"[[[ const a = states['{backwash}'].attributes; "
+            "if (a.status === 'running') return 'Running'; "
+            "if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly; "
+            "return 'Never run'; ]]]"
+        )
         action_cards.append(
             _button_card(
                 backwash,
@@ -120,6 +126,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
                         "styles": _styled(GREEN),
                     }
                 ],
+                label=backwash_label,
             )
         )
     if manual_pump:

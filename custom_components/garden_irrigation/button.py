@@ -68,9 +68,12 @@ class BackwashButton(IrrigationBaseEntity, ButtonEntity):
     @property
     def extra_state_attributes(self) -> dict:
         running = self.coordinator.rt.state in BACKWASH_ACTIVE_STATES
+        last_run = self.coordinator.backwash_last_run
         return {
             "status": "running" if running else "idle",
             "is_active": running,
+            "last_run": last_run.isoformat() if last_run else None,
+            "last_run_friendly": self.coordinator.backwash_last_run_friendly(),
         }
 
 
