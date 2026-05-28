@@ -12,6 +12,10 @@ from .coordinator import IrrigationCoordinator
 
 GREEN = "#2e7d32"
 AMBER = "#ef6c00"
+# The default inactive icon color button-card uses for the switch buttons
+# (Details, Pump). Applying it to the Water all / Backwash buttons gives all
+# four "main" buttons a matching blue icon, separating them from the zones.
+ICON_BLUE = "var(--paper-item-icon-color)"
 
 
 def _resolve(hass: HomeAssistant, entry_id: str, suffix: str, domain: str) -> str | None:
@@ -84,7 +88,6 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
     ]
     entities_card = {
         "type": "entities",
-        "title": "Garden Irrigation",
         "show_header_toggle": False,
         "entities": [
             {"entity": eid, "name": label} for eid, label in entity_rows if eid
@@ -108,6 +111,8 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         if water_all
         else None
     )
+    if water_all_card:
+        water_all_card["styles"] = {"icon": [{"color": ICON_BLUE}]}
 
     details_card = (
         {
@@ -144,6 +149,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             ],
             label=backwash_label,
         )
+        backwash_card["styles"] = {"icon": [{"color": ICON_BLUE}]}
 
     pump_card = None
     if manual_pump:

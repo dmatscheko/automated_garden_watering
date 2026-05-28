@@ -29,6 +29,10 @@ cards:
             name: Water all / STOP
             icon: mdi:sprinkler-variant
             show_state: false
+            # Blue icon to match the other 3 main buttons (Details, Backwash, Pump).
+            styles:
+              icon:
+                - color: var(--paper-item-icon-color)
             tap_action:
               action: perform-action
               perform_action: button.press
@@ -63,7 +67,6 @@ cards:
             state: 'on'
         card:
           type: entities
-          title: Garden Irrigation
           show_header_toggle: false
           entities:
             - entity: sensor.garden_irrigation_status
@@ -94,6 +97,10 @@ cards:
             icon: mdi:backup-restore
             show_state: false
             show_label: true
+            # Blue icon to match the other 3 main buttons.
+            styles:
+              icon:
+                - color: var(--paper-item-icon-color)
             tap_action:
               action: perform-action
               perform_action: button.press

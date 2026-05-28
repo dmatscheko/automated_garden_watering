@@ -13,6 +13,7 @@ A Home Assistant integration for garden irrigation with a queue-based watering c
 - Global watering duration multiplier (e.g. `2.5` = water 2.5× longer than the per-zone default).
 - Daily start timer with on/off switch.
 - Status sensor & queue sensor for dashboards.
+- UI available in English and German.
 
 ## Installation (HACS)
 
