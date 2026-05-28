@@ -11,9 +11,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    BACKWASH_ACTIVE_STATES,
     DOMAIN,
-    STATE_BACKWASH,
-    STATE_BACKWASH_PRESSURE,
     STATE_IDLE,
 )
 from .coordinator import IrrigationCoordinator
@@ -68,7 +67,7 @@ class BackwashButton(IrrigationBaseEntity, ButtonEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        running = self.coordinator.rt.state in (STATE_BACKWASH, STATE_BACKWASH_PRESSURE)
+        running = self.coordinator.rt.state in BACKWASH_ACTIVE_STATES
         return {
             "status": "running" if running else "idle",
             "is_active": running,

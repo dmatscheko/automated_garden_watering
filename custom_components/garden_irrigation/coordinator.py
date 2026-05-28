@@ -16,7 +16,9 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_BACKWASH,
+    BACKWASH_ACTIVE_STATES,
     CONF_BACKWASH_DELAY,
+    CONF_BACKWASH_FLUSH_RUNTIME,
     CONF_BACKWASH_INTERVAL,
     CONF_BACKWASH_RUNTIME,
     CONF_BACKWASH_THRESHOLD,
@@ -32,6 +34,7 @@ from .const import (
     CONF_ZONE_ORDER,
     CONF_ZONES,
     DEFAULT_BACKWASH_DELAY,
+    DEFAULT_BACKWASH_FLUSH_RUNTIME,
     DEFAULT_BACKWASH_INTERVAL,
     DEFAULT_BACKWASH_RUNTIME,
     DEFAULT_BACKWASH_THRESHOLD,
@@ -42,6 +45,7 @@ from .const import (
     DOMAIN,
     SIGNAL_UPDATE,
     STATE_BACKWASH,
+    STATE_BACKWASH_FLUSH,
     STATE_BACKWASH_PRESSURE,
     STATE_IDLE,
     STATE_PUMP_PRESSURE,
@@ -88,6 +92,7 @@ class IrrigationCoordinator:
         self.rt = RuntimeState()
         self._store: Store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
         self.last_run: dict[str, datetime] = {}
+        self.pump_last_run: datetime | None = None
         self._reload_config(data)
 
     # ---------- configuration ----------
@@ -112,6 +117,9 @@ class IrrigationCoordinator:
         self.pump_delay: int = int(data.get(CONF_PUMP_DELAY, DEFAULT_PUMP_DELAY))
         self.backwash_delay: int = int(data.get(CONF_BACKWASH_DELAY, DEFAULT_BACKWASH_DELAY))
         self.backwash_runtime: int = int(data.get(CONF_BACKWASH_RUNTIME, DEFAULT_BACKWASH_RUNTIME))
+        self.backwash_flush_runtime: int = int(
+            data.get(CONF_BACKWASH_FLUSH_RUNTIME, DEFAULT_BACKWASH_FLUSH_RUNTIME)
+        )
         self.backwash_interval: int = int(data.get(CONF_BACKWASH_INTERVAL, DEFAULT_BACKWASH_INTERVAL))
         self.backwash_threshold: int = int(data.get(CONF_BACKWASH_THRESHOLD, DEFAULT_BACKWASH_THRESHOLD))
         self.daily_start: str = data.get(CONF_DAILY_START, DEFAULT_DAILY_START) or DEFAULT_DAILY_START
@@ -154,7 +162,7 @@ class IrrigationCoordinator:
         rt = self.rt
         if rt.state == STATE_WATERING:
             return max(0, rt.active_remaining)
-        if rt.state in (STATE_PUMP_PRESSURE, STATE_BACKWASH_PRESSURE, STATE_BACKWASH):
+        if rt.state == STATE_PUMP_PRESSURE or rt.state in BACKWASH_ACTIVE_STATES:
             return max(0, rt.phase_remaining)
         return 0
 
@@ -202,17 +210,26 @@ class IrrigationCoordinator:
         for z in self.zones.values():
             await self._switch(z.entity_id, False)
 
+    async def _pump_on(self) -> None:
+        """Turn the pump on and record the run time."""
+        await self._switch(self.pump_switch, True)
+        self.pump_last_run = dt_util.now()
+        self._persist_last_run()
+
     # ---------- lifecycle ----------
 
     async def async_start(self) -> None:
         from homeassistant.helpers.event import async_track_time_interval
 
         stored = await self._store.async_load()
-        if stored and isinstance(stored.get("last_run"), dict):
-            for zid, iso in stored["last_run"].items():
-                parsed = dt_util.parse_datetime(iso)
-                if parsed:
-                    self.last_run[zid] = parsed
+        if stored:
+            if isinstance(stored.get("last_run"), dict):
+                for zid, iso in stored["last_run"].items():
+                    parsed = dt_util.parse_datetime(iso)
+                    if parsed:
+                        self.last_run[zid] = parsed
+            if stored.get("pump_last_run"):
+                self.pump_last_run = dt_util.parse_datetime(stored["pump_last_run"])
 
         self._tick_unsub = async_track_time_interval(
             self.hass, self._on_tick, timedelta(seconds=1)
@@ -223,22 +240,23 @@ class IrrigationCoordinator:
     def _persist_last_run(self) -> None:
         self._store.async_delay_save(
             lambda: {
-                "last_run": {zid: dt.isoformat() for zid, dt in self.last_run.items()}
+                "last_run": {
+                    zid: dt.isoformat() for zid, dt in self.last_run.items()
+                },
+                "pump_last_run": (
+                    self.pump_last_run.isoformat() if self.pump_last_run else None
+                ),
             },
             2,
         )
 
-    def zone_last_run(self, zone_id: str) -> datetime | None:
-        return self.last_run.get(zone_id)
-
-    def zone_last_run_friendly(self, zone_id: str) -> str | None:
-        """Human friendly 'Today 14:30' / 'Yesterday 09:00' / 'Mon 09:00' / 'May 03'."""
-        dt = self.last_run.get(zone_id)
+    @staticmethod
+    def _friendly_dt(dt: datetime | None) -> str | None:
+        """'Today 14:30' / 'Yesterday 09:00' / 'Mon 09:00' / 'May 03'."""
         if not dt:
             return None
         local = dt_util.as_local(dt)
-        today = dt_util.now().date()
-        delta_days = (today - local.date()).days
+        delta_days = (dt_util.now().date() - local.date()).days
         if delta_days <= 0:
             return f"Today {local:%H:%M}"
         if delta_days == 1:
@@ -246,6 +264,15 @@ class IrrigationCoordinator:
         if delta_days < 7:
             return local.strftime("%a %H:%M")
         return local.strftime("%b %d")
+
+    def zone_last_run(self, zone_id: str) -> datetime | None:
+        return self.last_run.get(zone_id)
+
+    def zone_last_run_friendly(self, zone_id: str) -> str | None:
+        return self._friendly_dt(self.last_run.get(zone_id))
+
+    def pump_last_run_friendly(self) -> str | None:
+        return self._friendly_dt(self.pump_last_run)
 
     async def async_stop(self) -> None:
         if self._tick_unsub:
@@ -300,7 +327,7 @@ class IrrigationCoordinator:
 
         if rt.state == STATE_IDLE:
             if rt.queue:
-                await self._switch(self.pump_switch, True)
+                await self._pump_on()
                 rt.state = STATE_PUMP_PRESSURE
                 rt.phase_remaining = max(0, self.pump_delay)
                 if rt.phase_remaining == 0:
@@ -348,26 +375,28 @@ class IrrigationCoordinator:
             return
 
         if rt.state == STATE_BACKWASH_PRESSURE:
+            # Pump on, valves closed, pressure building up.
             rt.phase_remaining -= 1
             if rt.phase_remaining <= 0:
-                await self._switch(self.backwash_switch, True)
-                rt.state = STATE_BACKWASH
-                rt.phase_remaining = max(1, self.backwash_runtime)
+                await self._begin_reverse_flow()
             return
 
         if rt.state == STATE_BACKWASH:
+            # Reverse-flow phase: pump OFF, backwash valve open. The built-up
+            # pressure pushes water backwards through the filter, dislodging dirt.
             rt.phase_remaining -= 1
             if rt.phase_remaining <= 0:
-                await self._switch(self.backwash_switch, False)
-                rt.since_last_backwash = 0
-                if rt.queue and rt.active_remaining > 0:
-                    # Resume the paused zone
-                    await self._start_active_zone()
-                elif rt.queue:
-                    # Active had finished; this was end-of-queue backwash; shouldn't have remaining queue
-                    await self._start_active_zone()
-                else:
-                    await self._finish_queue()
+                # Pump back on to flush the dislodged dirt out.
+                await self._pump_on()
+                rt.state = STATE_BACKWASH_FLUSH
+                rt.phase_remaining = max(1, self.backwash_flush_runtime)
+            return
+
+        if rt.state == STATE_BACKWASH_FLUSH:
+            # Pump ON, backwash valve still open: flush dislodged dirt away.
+            rt.phase_remaining -= 1
+            if rt.phase_remaining <= 0:
+                await self._after_backwash()
             return
 
     async def _start_active_zone(self) -> None:
@@ -390,26 +419,51 @@ class IrrigationCoordinator:
         rt.state = STATE_WATERING
 
     async def _enter_backwash_pressure(self, triggered_during_run: bool) -> None:
+        """Start a backwash. Sequence:
+
+        1. Close all zone valves, pump ON, wait `backwash_delay` (build pressure).
+        2. Pump OFF + open backwash valve, wait `backwash_runtime` (reverse flow).
+        3. Pump ON, wait `backwash_flush_runtime` (flush out dirt).
+        4. Close backwash valve, resume watering or finish.
+        """
         rt = self.rt
         if not self.backwash_switch:
-            # No backwash configured — skip
-            if rt.queue and rt.active_remaining > 0:
-                await self._start_active_zone()
-            elif rt.queue:
+            # No backwash configured — skip straight back to watering/finish.
+            if rt.queue:
                 await self._start_active_zone()
             else:
                 await self._finish_queue()
             return
-        # Make sure pump is on
-        await self._switch(self.pump_switch, True)
-        # Ensure all zone valves closed
+        # Build pressure with the pump on and all zone valves closed.
+        await self._pump_on()
         await self._close_all_zone_valves()
         rt.state = STATE_BACKWASH_PRESSURE
         rt.phase_remaining = max(0, self.backwash_delay)
         if rt.phase_remaining == 0:
-            await self._switch(self.backwash_switch, True)
-            rt.state = STATE_BACKWASH
-            rt.phase_remaining = max(1, self.backwash_runtime)
+            await self._begin_reverse_flow()
+
+    async def _begin_reverse_flow(self) -> None:
+        """Pressure is built: turn the pump OFF, then open the backwash valve.
+
+        With the pump off, the built-up pressure flows backwards through the
+        filter (the pump would otherwise fight against that reverse flow).
+        """
+        rt = self.rt
+        await self._switch(self.pump_switch, False)
+        await self._switch(self.backwash_switch, True)
+        rt.state = STATE_BACKWASH
+        rt.phase_remaining = max(1, self.backwash_runtime)
+
+    async def _after_backwash(self) -> None:
+        """Close the backwash valve and resume watering, or finish."""
+        rt = self.rt
+        await self._switch(self.backwash_switch, False)
+        rt.since_last_backwash = 0
+        if rt.queue:
+            # Resumes a paused zone (active_remaining > 0) or starts the next one.
+            await self._start_active_zone()
+        else:
+            await self._finish_queue()
 
     async def _maybe_end_of_queue_backwash(self) -> None:
         rt = self.rt
@@ -478,7 +532,7 @@ class IrrigationCoordinator:
             if not self.backwash_switch:
                 return
             rt = self.rt
-            if rt.state in (STATE_BACKWASH, STATE_BACKWASH_PRESSURE):
+            if rt.state in BACKWASH_ACTIVE_STATES:
                 return
             # If currently watering, close the active valve and pause
             if rt.state == STATE_WATERING and rt.queue:
@@ -507,7 +561,10 @@ class IrrigationCoordinator:
                 self.rt.state,
             )
             return False
-        await self._switch(self.pump_switch, on)
+        if on:
+            await self._pump_on()
+        else:
+            await self._switch(self.pump_switch, False)
         self._notify()
         return True
 

@@ -12,6 +12,7 @@ from homeassistant.helpers import selector
 from .const import (
     CONF_BACKWASH,
     CONF_BACKWASH_DELAY,
+    CONF_BACKWASH_FLUSH_RUNTIME,
     CONF_BACKWASH_INTERVAL,
     CONF_BACKWASH_RUNTIME,
     CONF_BACKWASH_THRESHOLD,
@@ -27,6 +28,7 @@ from .const import (
     CONF_ZONE_ORDER,
     CONF_ZONES,
     DEFAULT_BACKWASH_DELAY,
+    DEFAULT_BACKWASH_FLUSH_RUNTIME,
     DEFAULT_BACKWASH_INTERVAL,
     DEFAULT_BACKWASH_RUNTIME,
     DEFAULT_BACKWASH_THRESHOLD,
@@ -85,6 +87,16 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
             vol.Required(
                 CONF_BACKWASH_RUNTIME,
                 default=defaults.get(CONF_BACKWASH_RUNTIME, DEFAULT_BACKWASH_RUNTIME),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=600, step=1, mode="box", unit_of_measurement="s"
+                )
+            ),
+            vol.Required(
+                CONF_BACKWASH_FLUSH_RUNTIME,
+                default=defaults.get(
+                    CONF_BACKWASH_FLUSH_RUNTIME, DEFAULT_BACKWASH_FLUSH_RUNTIME
+                ),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1, max=600, step=1, mode="box", unit_of_measurement="s"

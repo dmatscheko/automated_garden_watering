@@ -38,8 +38,6 @@ cards:
             name: Daily start time
           - entity: switch.garden_irrigation_daily_timer
             name: Daily timer
-          - entity: switch.garden_irrigation_pump_manual
-            name: Pump (manual)
 
       - type: horizontal-stack
         cards:
@@ -79,6 +77,29 @@ cards:
                   card:
                     - background-color: '#2e7d32'
                     - color: white
+          # Manual pump is a switch -> tap toggles it. Green while on, with a
+          # "last run" line when off (like the zone buttons).
+          - type: custom:button-card
+            entity: switch.garden_irrigation_pump_manual
+            name: Pump (manual)
+            icon: mdi:water-pump
+            show_state: false
+            show_label: true
+            tap_action:
+              action: toggle
+            state:
+              - value: 'on'
+                styles:
+                  card:
+                    - background-color: '#2e7d32'
+                    - color: white
+            label: >-
+              [[[
+                const e = states['switch.garden_irrigation_pump_manual'];
+                if (e.state === 'on') return 'On';
+                if (e.attributes.last_run_friendly) return 'Last: ' + e.attributes.last_run_friendly;
+                return 'Never run';
+              ]]]
 
       - type: grid
         columns: 2

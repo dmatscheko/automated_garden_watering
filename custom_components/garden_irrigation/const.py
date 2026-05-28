@@ -17,7 +17,8 @@ CONF_ZONE_ID = "id"
 CONF_MULTIPLIER = "multiplier"
 CONF_PUMP_DELAY = "pump_pressure_delay"        # seconds
 CONF_BACKWASH_DELAY = "backwash_pressure_delay"  # seconds
-CONF_BACKWASH_RUNTIME = "backwash_runtime"     # seconds
+CONF_BACKWASH_RUNTIME = "backwash_runtime"     # seconds (reverse-flow phase, pump off)
+CONF_BACKWASH_FLUSH_RUNTIME = "backwash_flush_runtime"  # seconds (flush phase, pump on)
 CONF_BACKWASH_INTERVAL = "backwash_interval"   # seconds of active watering between auto-backwashes (0 = off)
 CONF_BACKWASH_THRESHOLD = "backwash_threshold"  # seconds of cumulative watering after which end-of-queue backwash runs
 CONF_DAILY_START = "daily_start"               # "HH:MM:SS"
@@ -28,6 +29,7 @@ DEFAULT_MULTIPLIER = 1.0
 DEFAULT_PUMP_DELAY = 15
 DEFAULT_BACKWASH_DELAY = 10
 DEFAULT_BACKWASH_RUNTIME = 15
+DEFAULT_BACKWASH_FLUSH_RUNTIME = 10
 DEFAULT_BACKWASH_INTERVAL = 15 * 60
 DEFAULT_BACKWASH_THRESHOLD = 3 * 60
 DEFAULT_ZONE_DURATION = 10 * 60
@@ -38,7 +40,16 @@ DEFAULT_DAILY_TIMER_ENABLED = False
 STATE_IDLE = "idle"
 STATE_PUMP_PRESSURE = "pump_pressure"
 STATE_WATERING = "watering"
-STATE_BACKWASH_PRESSURE = "backwash_pressure"
-STATE_BACKWASH = "backwash"
+STATE_BACKWASH_PRESSURE = "backwash_pressure"  # pump on, building pressure, valves closed
+STATE_BACKWASH = "backwash"                    # reverse-flow phase: pump OFF, backwash valve open
+STATE_BACKWASH_FLUSH = "backwash_flush"        # flush phase: pump ON, backwash valve still open
+
+# States during which a backwash is in progress (button stays "running",
+# queue countdown is paused, no zone may run).
+BACKWASH_ACTIVE_STATES = (
+    STATE_BACKWASH_PRESSURE,
+    STATE_BACKWASH,
+    STATE_BACKWASH_FLUSH,
+)
 
 SIGNAL_UPDATE = f"{DOMAIN}_update"

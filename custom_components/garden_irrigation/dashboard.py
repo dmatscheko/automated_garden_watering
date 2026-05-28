@@ -80,7 +80,6 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         (multiplier, "Watering multiplier"),
         (daily_start, "Daily start time"),
         (daily_timer, "Daily timer"),
-        (manual_pump, "Pump (manual)"),
     ]
     entities_card = {
         "type": "entities",
@@ -122,6 +121,28 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
                     }
                 ],
             )
+        )
+    if manual_pump:
+        # The manual pump is a switch -> tap toggles it. Styled like the zone
+        # buttons: green while on, with a "last run" line when off.
+        pump_label = (
+            f"[[[ const e = states['{manual_pump}']; "
+            "if (e.state === 'on') return 'On'; "
+            "if (e.attributes.last_run_friendly) return 'Last: ' + e.attributes.last_run_friendly; "
+            "return 'Never run'; ]]]"
+        )
+        action_cards.append(
+            {
+                "type": "custom:button-card",
+                "entity": manual_pump,
+                "name": "Pump (manual)",
+                "icon": "mdi:water-pump",
+                "show_state": False,
+                "show_label": True,
+                "tap_action": {"action": "toggle"},
+                "state": [{"value": "on", "styles": _styled(GREEN)}],
+                "label": pump_label,
+            }
         )
 
     # Zone buttons in run order, colored by status with a live countdown label.

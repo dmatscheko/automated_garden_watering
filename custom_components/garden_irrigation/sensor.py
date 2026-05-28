@@ -7,9 +7,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    BACKWASH_ACTIVE_STATES,
     DOMAIN,
-    STATE_BACKWASH,
-    STATE_BACKWASH_PRESSURE,
     STATE_IDLE,
 )
 from .coordinator import IrrigationCoordinator
@@ -146,7 +145,7 @@ class CurrentStepRemainingSensor(IrrigationBaseEntity, SensorEntity):
         active = self.coordinator.zones.get(active_id) if active_id else None
         attrs["phase"] = rt.state
         attrs["label"] = active.name if active else (
-            "Backwash" if rt.state in (STATE_BACKWASH, STATE_BACKWASH_PRESSURE) else "—"
+            "Backwash" if rt.state in BACKWASH_ACTIVE_STATES else "—"
         )
         return attrs
 
@@ -167,8 +166,7 @@ class QueueRemainingSensor(IrrigationBaseEntity, SensorEntity):
     def extra_state_attributes(self) -> dict:
         attrs = _hms_attrs(self.coordinator.queue_remaining_seconds())
         attrs["queue_length"] = len(self.coordinator.rt.queue)
-        attrs["paused_for_backwash"] = self.coordinator.rt.state in (
-            STATE_BACKWASH,
-            STATE_BACKWASH_PRESSURE,
+        attrs["paused_for_backwash"] = (
+            self.coordinator.rt.state in BACKWASH_ACTIVE_STATES
         )
         return attrs

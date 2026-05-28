@@ -65,9 +65,13 @@ class ManualPumpSwitch(IrrigationBaseEntity, SwitchEntity):
         controlled_by = (
             "automation" if self.coordinator.rt.state != STATE_IDLE else "manual"
         )
+        last_run = self.coordinator.pump_last_run
         return {
             "pump_entity": self.coordinator.pump_switch,
             "controlled_by": controlled_by,
+            "status": "running" if self.is_on else "idle",
+            "last_run": last_run.isoformat() if last_run else None,
+            "last_run_friendly": self.coordinator.pump_last_run_friendly(),
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
