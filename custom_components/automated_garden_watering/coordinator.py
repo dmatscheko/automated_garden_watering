@@ -90,7 +90,9 @@ class IrrigationCoordinator:
         self._tick_unsub: CALLBACK_TYPE | None = None
         self._daily_unsub: CALLBACK_TYPE | None = None
         self.rt = RuntimeState()
-        self._store: Store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
+        self._store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}"
+        )
         self.last_run: dict[str, datetime] = {}
         self.pump_last_run: datetime | None = None
         self.backwash_last_run: datetime | None = None

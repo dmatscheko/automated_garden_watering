@@ -47,8 +47,8 @@ async def async_get_config_entry_diagnostics(
                     "duration": z.duration,
                     "order": z.order,
                     "last_run": (
-                        coordinator.zone_last_run(z.id).isoformat()
-                        if coordinator.zone_last_run(z.id)
+                        last_run.isoformat()
+                        if (last_run := coordinator.zone_last_run(z.id))
                         else None
                     ),
                 }

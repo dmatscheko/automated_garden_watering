@@ -200,7 +200,10 @@ excluded from history as described in *Database / recorder* above.
 
 - **A zone doesn't run.** Open Developer Tools → States and verify the zone's
   `switch.*` entity exists and toggles when called manually. If it doesn't, the
-  zone button will show as unavailable.
+  zone button will show as unavailable and a repair issue is raised under
+  *Settings → System → Repairs*.
+- **Changing pump or backwash switch.** Use *Settings → Devices & Services →
+  Automated Garden Watering → Reconfigure*. Zones stay in *Configure → Zones*.
 - **Pump won't turn off.** Manual pump-off is intentionally refused while a
   queue or backwash is running. Press *Water all* (or call
   `automated_garden_watering.stop`) to abort, then the pump can be turned off.
@@ -232,12 +235,14 @@ With [uv](https://docs.astral.sh/uv/) installed:
 
 ```sh
 uv sync --dev
-uv run pytest                                         # all tests
+uv run pytest                                                    # all tests
 uv run pytest --cov=custom_components/automated_garden_watering  # with coverage
+uv run mypy custom_components/automated_garden_watering          # strict type-check
 ```
 
-Coverage currently sits at ~96%. The state machine, config + options flows,
-service actions, and diagnostics are exercised end-to-end via the HA test
+Coverage currently sits at ~96% and the codebase passes `mypy --strict`. The
+state machine, config + options flows, reconfiguration flow, service actions,
+repair issues, and diagnostics are all exercised end-to-end via the HA test
 harness (no real switches required).
 
 ## License

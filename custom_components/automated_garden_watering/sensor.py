@@ -1,6 +1,8 @@
 """Status and queue sensors."""
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -53,7 +55,7 @@ def _fmt_hms(seconds: int) -> str:
     return f"{seconds // 3600:d}:{(seconds % 3600) // 60:02d}:{seconds % 60:02d}"
 
 
-def _hms_attrs(seconds: int) -> dict:
+def _hms_attrs(seconds: int) -> dict[str, Any]:
     seconds = max(0, int(seconds))
     return {
         "total_seconds": seconds,
@@ -77,7 +79,7 @@ class StatusSensor(IrrigationBaseEntity, SensorEntity):
         return self.coordinator.rt.state
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         # Only slow-changing attributes here. The per-second countdown values
         # live on the dedicated "*_time_remaining" sensors so this entity's
         # state/attributes stay stable between transitions and don't flood the
@@ -132,7 +134,7 @@ class QueueSensor(IrrigationBaseEntity, SensorEntity):
         return ", ".join(names)
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         rt = self.coordinator.rt
         return {
             "length": len(rt.queue),
@@ -154,7 +156,7 @@ class CurrentStepRemainingSensor(IrrigationBaseEntity, SensorEntity):
         return _fmt_hms(self.coordinator.current_step_remaining_seconds())
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         rt = self.coordinator.rt
         attrs = _hms_attrs(self.coordinator.current_step_remaining_seconds())
         active_id = self.coordinator.active_zone_id()
@@ -179,7 +181,7 @@ class QueueRemainingSensor(IrrigationBaseEntity, SensorEntity):
         return _fmt_hms(self.coordinator.queue_remaining_seconds())
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         attrs = _hms_attrs(self.coordinator.queue_remaining_seconds())
         attrs["queue_length"] = len(self.coordinator.rt.queue)
         attrs["paused_for_backwash"] = (

@@ -1,7 +1,19 @@
 """Constants for the Automated Garden Watering integration."""
 from __future__ import annotations
 
+from typing import TypedDict
+
 DOMAIN = "automated_garden_watering"
+
+
+class ZoneConfig(TypedDict, total=False):
+    """Per-zone config entry payload."""
+
+    id: str
+    entity_id: str
+    name: str
+    duration: int
+    order: int
 
 # Config / options keys
 CONF_PUMP = "pump_switch"

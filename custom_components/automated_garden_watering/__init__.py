@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
@@ -16,6 +17,7 @@ from homeassistant.util import slugify
 
 from .const import CONF_ZONE_ID, CONF_ZONE_ORDER, CONF_ZONES, DOMAIN, STATE_IDLE
 from .coordinator import IrrigationCoordinator
+from .repairs import async_sync_issues
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,14 +44,14 @@ ATTR_ZONE = "zone"
 _WATER_ZONE_SCHEMA = vol.Schema({vol.Required(ATTR_ZONE): cv.string})
 
 
-def _merged(entry: ConfigEntry) -> dict:
+def _merged(entry: ConfigEntry) -> dict[str, Any]:
     """Options override data."""
-    merged = dict(entry.data)
+    merged: dict[str, Any] = dict(entry.data)
     merged.update(entry.options or {})
     return merged
 
 
-def _zone_ids(data: dict) -> set[str]:
+def _zone_ids(data: dict[str, Any]) -> set[str]:
     return {z[CONF_ZONE_ID] for z in (data.get(CONF_ZONES) or []) if z.get(CONF_ZONE_ID)}
 
 
@@ -61,7 +63,8 @@ def _loaded_coordinator(hass: HomeAssistant) -> IrrigationCoordinator:
     """
     for entry in hass.config_entries.async_entries(DOMAIN):
         if entry.state is ConfigEntryState.LOADED:
-            return entry.runtime_data
+            coord: IrrigationCoordinator = entry.runtime_data
+            return coord
     raise ServiceValidationError(
         translation_domain=DOMAIN,
         translation_key="not_loaded",
@@ -135,6 +138,8 @@ async def async_setup_entry(
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Entities (and the device) now exist; give zone buttons their ordered ids.
     _sync_zone_entity_ids(hass, entry)
+    # Surface a repair issue for any configured switch entity that's missing.
+    async_sync_issues(hass, coordinator)
 
     entry.async_on_unload(entry.add_update_listener(_options_updated))
     return True
@@ -162,6 +167,7 @@ async def _options_updated(
     # so an active watering run is never interrupted.
     coordinator.update_config(_merged(entry))
     _sync_zone_entity_ids(hass, entry)
+    async_sync_issues(hass, coordinator)
 
 
 def _device_slug(hass: HomeAssistant, entry: ConfigEntry) -> str:

@@ -96,11 +96,14 @@ class ManualPumpSwitch(IrrigationBaseEntity, SwitchEntity):
 
     @property
     def is_on(self) -> bool:
-        state = self.hass.states.get(self.coordinator.pump_switch)
+        pump = self.coordinator.pump_switch
+        if pump is None:
+            return False
+        state = self.hass.states.get(pump)
         return bool(state and state.state == STATE_ON)
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         controlled_by = (
             "automation" if self.coordinator.rt.state != STATE_IDLE else "manual"
         )

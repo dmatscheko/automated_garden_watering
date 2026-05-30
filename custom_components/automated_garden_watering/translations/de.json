@@ -45,10 +45,25 @@
         "title": "Weitere Zone hinzufügen?",
         "description": "Bisher {count} Zone(n) konfiguriert.",
         "data": {"add_another": "Weitere Zone hinzufügen"}
+      },
+      "reconfigure": {
+        "title": "Globale Einstellungen ändern",
+        "description": "Ändere die Pumpen-/Rückspülventil-Schalter oder passe die Zeit-Vorgaben an. Zonen werden über „Konfigurieren“ verwaltet.",
+        "data": {
+          "pump_switch": "Brunnenpumpen-Schalter (optional)",
+          "backwash_switch": "Rückspülventil-Schalter (optional)",
+          "pump_pressure_delay": "Pumpen-Druckaufbau-Verzögerung (Sekunden)",
+          "backwash_pressure_delay": "Rückspül-Druckaufbau-Verzögerung (Sekunden)",
+          "backwash_runtime": "Rückspül-Rückflusszeit (Sekunden, Pumpe AUS)",
+          "backwash_flush_runtime": "Rückspül-Spülzeit (Sekunden, Pumpe AN)",
+          "backwash_interval": "Automatisches Rückspül-Intervall (Sekunden, 0 = aus)",
+          "backwash_threshold": "Rückspül-Schwelle am Warteschlangen-Ende (Sekunden)"
+        }
       }
     },
     "abort": {
-      "already_configured": "Die Automatische Gartenbewässerung ist bereits eingerichtet. Nutze „Konfigurieren“ am vorhandenen Eintrag, um Einstellungen zu ändern."
+      "already_configured": "Die Automatische Gartenbewässerung ist bereits eingerichtet. Nutze „Konfigurieren“ am vorhandenen Eintrag, um Einstellungen zu ändern.",
+      "reconfigure_successful": "Einstellungen aktualisiert und neu geladen."
     }
   },
   "options": {
@@ -179,6 +194,12 @@
     },
     "zone_not_found": {
       "message": "Keine Zone passt zu „{zone}“. Bitte den Anzeigenamen, die Zonen-ID oder die Schalter-Entitäts-ID des Ventils angeben."
+    }
+  },
+  "issues": {
+    "missing_switch": {
+      "title": "Schalter für {name} fehlt",
+      "description": "Die für {name} konfigurierte Schalter-Entität `{entity}` existiert in Home Assistant nicht mehr. Die zugehörige Entität bleibt nicht verfügbar, bis du sie auf einen gültigen Schalter zeigst – über *Einstellungen → Geräte & Dienste → Automatische Gartenbewässerung → Neu konfigurieren* (für Pumpe/Rückspülventil) oder *Konfigurieren → Zonen* (für Zonenventile)."
     }
   }
 }

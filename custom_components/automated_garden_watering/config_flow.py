@@ -6,6 +6,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
@@ -61,7 +62,7 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=defaults.get(CONF_PUMP_DELAY, DEFAULT_PUMP_DELAY),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=0, max=600, step=1, mode="box", unit_of_measurement="s"
+                    min=0, max=600, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s"
                 )
             ),
             vol.Required(
@@ -69,7 +70,7 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=defaults.get(CONF_BACKWASH_DELAY, DEFAULT_BACKWASH_DELAY),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=0, max=600, step=1, mode="box", unit_of_measurement="s"
+                    min=0, max=600, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s"
                 )
             ),
             vol.Required(
@@ -77,7 +78,7 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=defaults.get(CONF_BACKWASH_RUNTIME, DEFAULT_BACKWASH_RUNTIME),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=1, max=600, step=1, mode="box", unit_of_measurement="s"
+                    min=1, max=600, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s"
                 )
             ),
             vol.Required(
@@ -87,7 +88,7 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
                 ),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=1, max=600, step=1, mode="box", unit_of_measurement="s"
+                    min=1, max=600, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s"
                 )
             ),
             vol.Required(
@@ -95,7 +96,7 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=defaults.get(CONF_BACKWASH_INTERVAL, DEFAULT_BACKWASH_INTERVAL),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=0, max=24 * 3600, step=30, mode="box", unit_of_measurement="s"
+                    min=0, max=24 * 3600, step=30, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s"
                 )
             ),
             vol.Required(
@@ -103,7 +104,7 @@ def _global_schema(defaults: dict[str, Any]) -> vol.Schema:
                 default=defaults.get(CONF_BACKWASH_THRESHOLD, DEFAULT_BACKWASH_THRESHOLD),
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
-                    min=0, max=24 * 3600, step=10, mode="box", unit_of_measurement="s"
+                    min=0, max=24 * 3600, step=10, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s"
                 )
             ),
             # NOTE: watering multiplier, daily start time and daily timer are
@@ -132,14 +133,14 @@ def _zone_schema(
             default=zone.get(CONF_ZONE_DURATION, DEFAULT_ZONE_DURATION),
         ): selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=1, max=24 * 3600, step=1, mode="box", unit_of_measurement="s"
+                min=1, max=24 * 3600, step=1, mode=selector.NumberSelectorMode.BOX, unit_of_measurement="s"
             )
         ),
         vol.Required(
             CONF_ZONE_ORDER,
             default=zone.get(CONF_ZONE_ORDER, next_order),
         ): selector.NumberSelector(
-            selector.NumberSelectorConfig(min=0, max=999, step=1, mode="box")
+            selector.NumberSelectorConfig(min=0, max=999, step=1, mode=selector.NumberSelectorMode.BOX)
         ),
     }
     if allow_delete:
@@ -166,7 +167,7 @@ class AutomatedGardenWateringConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
     ) -> "AutomatedGardenWateringOptionsFlow":
         return AutomatedGardenWateringOptionsFlow(config_entry)
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None):
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             self._globals = user_input
             return await self.async_step_zone()
@@ -175,7 +176,7 @@ class AutomatedGardenWateringConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
             data_schema=_global_schema({}),
         )
 
-    async def async_step_zone(self, user_input: dict[str, Any] | None = None):
+    async def async_step_zone(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             user_input[CONF_ZONE_ID] = uuid.uuid4().hex
             self._zones.append(user_input)
@@ -186,7 +187,7 @@ class AutomatedGardenWateringConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
             data_schema=_zone_schema(None, next_order=len(self._zones) + 1),
         )
 
-    async def async_step_zone_more(self, user_input: dict[str, Any] | None = None):
+    async def async_step_zone_more(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             if user_input.get("add_another"):
                 return await self.async_step_zone()
@@ -206,14 +207,35 @@ class AutomatedGardenWateringConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
             description_placeholders={"count": str(len(self._zones))},
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Reconfigure the integration's global settings from the integration card.
+
+        Zones stay in the options flow; this step only re-edits the pump /
+        backwash switch selection and timing defaults. Submitting writes back
+        into `entry.data` and triggers a reload so the new switches are picked
+        up immediately.
+        """
+        entry = self._get_reconfigure_entry()
+        defaults: dict[str, Any] = {**dict(entry.data), **(dict(entry.options) if entry.options else {})}
+        if user_input is not None:
+            new_data: dict[str, Any] = {**dict(entry.data), **user_input}
+            return self.async_update_reload_and_abort(entry, data=new_data)
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_global_schema({k: v for k, v in defaults.items() if k != CONF_ZONES}),
+        )
+
 
 class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
     """Options flow: edit globals, add/edit/remove zones."""
 
     def __init__(self, entry: config_entries.ConfigEntry) -> None:
         self.entry = entry
-        merged = dict(entry.data)
-        merged.update(entry.options or {})
+        merged: dict[str, Any] = dict(entry.data)
+        if entry.options:
+            merged.update(dict(entry.options))
         self._globals: dict[str, Any] = {
             k: v for k, v in merged.items() if k != CONF_ZONES
         }
@@ -222,13 +244,13 @@ class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
         ]
         self._edit_zone_id: str | None = None
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None):
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
             step_id="init",
             menu_options=["globals", "zones_list"],
         )
 
-    async def async_step_globals(self, user_input: dict[str, Any] | None = None):
+    async def async_step_globals(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             self._globals.update(user_input)
             return await self._save_and_exit()
@@ -236,7 +258,7 @@ class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
             step_id="globals", data_schema=_global_schema(self._globals)
         )
 
-    async def async_step_zones_list(self, user_input: dict[str, Any] | None = None):
+    async def async_step_zones_list(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             choice = user_input.get("action")
             if choice == "__add__":
@@ -248,7 +270,9 @@ class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
 
         # Only edit selections are shown. Deleting a zone is done from inside its
         # edit screen, so an accidental tap here can never remove a zone.
-        options = [{"value": "__add__", "label": "➕ Add a new zone"}]
+        options: list[selector.SelectOptionDict] = [
+            selector.SelectOptionDict(value="__add__", label="➕ Add a new zone")
+        ]
         for z in sorted(
             self._zones,
             key=lambda x: (x.get(CONF_ZONE_ORDER, 0), x.get(CONF_ZONE_NAME, "")),
@@ -257,7 +281,9 @@ class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
                 f"#{z.get(CONF_ZONE_ORDER, '?')} — {z.get(CONF_ZONE_NAME)} "
                 f"({z.get(CONF_ZONE_ENTITY)})"
             )
-            options.append({"value": f"edit:{z[CONF_ZONE_ID]}", "label": label})
+            options.append(
+                selector.SelectOptionDict(value=f"edit:{z[CONF_ZONE_ID]}", label=label)
+            )
 
         return self.async_show_form(
             step_id="zones_list",
@@ -265,14 +291,14 @@ class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Required("action"): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=options, mode="list", custom_value=False
+                            options=options, mode=selector.SelectSelectorMode.LIST, custom_value=False
                         )
                     )
                 }
             ),
         )
 
-    async def async_step_zone_edit(self, user_input: dict[str, Any] | None = None):
+    async def async_step_zone_edit(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         existing = None
         if self._edit_zone_id:
             for z in self._zones:
@@ -305,7 +331,7 @@ class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
             ),
         )
 
-    async def _save_and_exit(self):
+    async def _save_and_exit(self) -> ConfigFlowResult:
         new_options: dict[str, Any] = dict(self._globals)
         new_options[CONF_ZONES] = self._zones
         return self.async_create_entry(title="", data=new_options)

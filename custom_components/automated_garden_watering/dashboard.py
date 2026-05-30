@@ -323,7 +323,7 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         "# Without it, replace 'custom:button-card' with 'button' (you lose coloring,\n"
         "# the press actions still work).\n\n"
     )
-    body = yaml.safe_dump(
+    body: str = yaml.safe_dump(
         [view], sort_keys=False, allow_unicode=True, default_flow_style=False
     )
     return header + body

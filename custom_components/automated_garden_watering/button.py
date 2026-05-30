@@ -1,6 +1,8 @@
 """Buttons: Water All, Backwash, per-zone toggle, plus config helpers."""
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.persistent_notification import (
     async_create as async_create_notification,
@@ -48,7 +50,7 @@ class WaterAllButton(IrrigationBaseEntity, ButtonEntity):
         await self.coordinator.async_water_all(from_timer=False)
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         rt = self.coordinator.rt
         return {
             "running": rt.state != STATE_IDLE,
@@ -70,7 +72,7 @@ class BackwashButton(IrrigationBaseEntity, ButtonEntity):
         return self.coordinator.backwash_switch is not None
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         running = self.coordinator.rt.state in BACKWASH_ACTIVE_STATES
         last_run = self.coordinator.backwash_last_run
         return {
@@ -123,7 +125,8 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
     @property
     def name(self) -> str:
         zone = self.coordinator.zones.get(self._zone_id)
-        return zone.name if zone else self._attr_name
+        # _attr_name was set in __init__ and is always a non-None str here.
+        return zone.name if zone else (self._attr_name or "Zone")
 
     @property
     def available(self) -> bool:
@@ -138,7 +141,7 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
         await self.coordinator.async_toggle_zone(self._zone_id)
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         rt = self.coordinator.rt
         zone = self.coordinator.zones.get(self._zone_id)
         if not zone:

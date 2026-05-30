@@ -45,10 +45,31 @@
         "title": "Add another zone?",
         "description": "{count} zone(s) configured so far.",
         "data": {"add_another": "Add another zone"}
+      },
+      "reconfigure": {
+        "title": "Reconfigure global settings",
+        "description": "Change which pump / backwash switches the integration drives, or adjust the timing defaults. Zones are managed under the 'Configure' menu.",
+        "data": {
+          "pump_switch": "Well pump switch (optional)",
+          "backwash_switch": "Backwash valve switch (optional)",
+          "pump_pressure_delay": "Pump pressure build-up delay (seconds)",
+          "backwash_pressure_delay": "Backwash pressure build-up delay (seconds)",
+          "backwash_runtime": "Backwash reverse-flow time (seconds, pump OFF)",
+          "backwash_flush_runtime": "Backwash flush time (seconds, pump ON)",
+          "backwash_interval": "Automatic backwash interval (seconds, 0 = off)",
+          "backwash_threshold": "End-of-queue backwash threshold (seconds)"
+        }
       }
     },
     "abort": {
-      "already_configured": "Automated Garden Watering is already configured. Use 'Configure' on the existing entry to change settings."
+      "already_configured": "Automated Garden Watering is already configured. Use 'Configure' on the existing entry to change settings.",
+      "reconfigure_successful": "Settings updated and reloaded."
+    }
+  },
+  "issues": {
+    "missing_switch": {
+      "title": "Missing switch for {name}",
+      "description": "The switch entity `{entity}` configured for the {name} no longer exists in Home Assistant. The matching automated-garden-watering entity will stay unavailable until you point it at a valid switch via *Settings → Devices & Services → Automated Garden Watering → Reconfigure* (for pump/backwash) or *Configure → Zones* (for zone valves)."
     }
   },
   "options": {

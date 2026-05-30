@@ -16,7 +16,28 @@ dev = [
     "pytest-asyncio",
     "pytest-cov",
     "pytest-homeassistant-custom-component>=0.13.250",
+    "mypy>=1.13",
+    "types-PyYAML",
 ]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+disallow_untyped_decorators = false
+files = ["custom_components/automated_garden_watering"]
+
+[[tool.mypy.overrides]]
+# HA's helpers occasionally fall back to dynamic typing.
+module = "homeassistant.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Dashboard YAML is opaque text generation; let it skip strict mode for now.
+module = "custom_components.automated_garden_watering.dashboard"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
