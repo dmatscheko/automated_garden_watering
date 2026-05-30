@@ -4,6 +4,10 @@ A Home Assistant integration for garden irrigation with a queue-based watering c
 
 What sets it apart from other irrigation integrations: a **two-stage, interval-driven backwash** — a pump-off reverse-flow pass followed by a pump-on flush — that triggers automatically every N minutes of cumulative watering during long runs (and at end-of-queue when warranted). The reverse-flow stage lets stored pressure push water backwards through the filter to dislodge dirt, then the flush stage carries it away. The result is a filter that stays a lot cleaner than a single open-valve pulse.
 
+| [<img src="images/screenshot_01.png" width="360"/>](images/screenshot_01.png) | [<img src="images/screenshot_02.png" width="360"/>](images/screenshot_02.png) |
+|:---:|:---:|
+| Idle — every zone shows when it last watered. Click any zone to queue and automatically water it. | *Water all* clicked and then two zones manually dequeued: green running, orange queued, gray dequeued. |
+
 ## Features
 
 - Works on top of any existing Home Assistant `switch` entities (pump, backwash valve, zone valves).
