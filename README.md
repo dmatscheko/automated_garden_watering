@@ -1,4 +1,9 @@
+<div align="center">
+  <img src="images/icon.svg" alt="Pivot Proxy logo" width="96">
+
 # Automated Garden Watering — Home Assistant Custom Integration
+
+</div>
 
 A Home Assistant integration for garden irrigation with a queue-based watering controller, well pump and backwash valve coordination, automatic mid-cycle and end-of-cycle backwash, a daily timer, and a global watering multiplier.
 
