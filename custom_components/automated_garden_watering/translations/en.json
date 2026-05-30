@@ -32,13 +32,15 @@
           "name": "Display name",
           "entity_id": "Zone valve switch",
           "duration": "Default watering duration (seconds)",
-          "order": "Run order for 'Water all' (lower runs first)"
+          "order": "Run order for 'Water all' (lower runs first)",
+          "max_parallel": "Max parallel zones (1 = always runs alone)"
         },
         "data_description": {
           "name": "Friendly name shown in the dashboard.",
           "entity_id": "The Home Assistant switch entity that opens this zone's valve.",
           "duration": "Default time this zone runs. Effective time = duration × global multiplier.",
-          "order": "Smaller numbers run earlier. Use gaps (10, 20, 30…) to make later reordering easier."
+          "order": "Smaller numbers run earlier. Use gaps (10, 20, 30…) to make later reordering easier.",
+          "max_parallel": "Up to how many zones this one tolerates running with simultaneously. Use a value above 1 for low-flow zones (drip lines, small sprinklers) — when two or more such zones are queued back-to-back, they water in parallel, capped by the lowest max_parallel in the group. Default 1 = the zone never runs in parallel with others."
         }
       },
       "zone_more": {
@@ -117,6 +119,7 @@
           "entity_id": "Zone valve switch",
           "duration": "Default watering duration (seconds)",
           "order": "Run order for 'Water all' (lower runs first)",
+          "max_parallel": "Max parallel zones (1 = always runs alone)",
           "delete_zone": "Delete this zone"
         },
         "data_description": {
@@ -124,6 +127,7 @@
           "entity_id": "Home Assistant switch entity for this zone's valve.",
           "duration": "Default seconds; effective time = duration × multiplier.",
           "order": "Smaller numbers run earlier.",
+          "max_parallel": "Up to how many zones this one tolerates running with simultaneously. The group cap is the lowest value among queued zones running together. Default 1 = never runs in parallel.",
           "delete_zone": "Tick this and press Submit to permanently remove this zone. Leave unticked to save your edits."
         }
       }

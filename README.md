@@ -17,7 +17,8 @@ What sets it apart from other irrigation integrations: a **two-stage, interval-d
 
 - Works on top of any existing Home Assistant `switch` entities (pump, backwash valve, zone valves).
 - UI config flow + options flow (everything is editable later).
-- Queue model: one zone at a time, multiple zones queued.
+- Queue model: zones queue back-to-back; low-flow zones can opt into
+  **parallel execution** via a per-zone `max_parallel` setting (default 1).
 - "Water all" runs every zone in your configured run order.
 - Pump is always turned on first, with configurable pressure build-up delay.
 - Two-stage backwash (pump-off reverse flow + pump-on flush) for a much deeper filter clean; triggered manually at any time, automatically every N minutes of active watering, and at end-of-queue when the run was long enough or was started by the timer.
@@ -44,6 +45,51 @@ The **watering multiplier**, **daily start time** and **daily timer** are *not*
 in the config dialog — they have their own entities (`number` / `time` /
 `switch`) so you set them directly from the dashboard. Their values persist
 across restarts. This keeps each setting in exactly one place.
+
+### Parallel zones (`max_parallel`)
+
+Each zone has a `max_parallel` value (default 1). When zones are queued one
+after another, the controller forms a **group**: it walks the queue head and
+pulls zones in as long as each candidate's `max_parallel` is ≥ the current
+group size. The group's effective cap is the lowest `max_parallel` among its
+members. All zones in a group water in parallel; once they drain, the next
+group forms.
+
+Example queue (max_parallel in parentheses):
+
+| Queue | Active group | Why |
+|---|---|---|
+| `A(1), B(2), C(3), D(2), E(3), F(3)` | A alone | A's cap is 1 |
+| → after A finishes | B + C | cap = min(2, 3) = 2 |
+| → after B+C finish | D + E | cap = min(2, 3) = 2 |
+| → after D+E finish | F alone | nothing left to join |
+
+**Refill on early finish.** If a zone in a group finishes earlier than its
+peers, the next queued zone is promoted into the now-free slot as long as the
+group cap and the candidate's own `max_parallel` both allow it. Otherwise the
+group keeps draining and a fresh group forms only when *all* current zones
+have ended.
+
+**Backwash** pauses every active zone (snapshot of remaining seconds preserved
+in `paused`), runs the two-stage wash, then re-opens all paused valves and
+resumes the countdown where it left off.
+
+**Adjacency matters — zones only group with their queue neighbors.** Group
+formation walks the queue head outward and stops at the first zone that
+doesn't fit; it never skips over a queued zone. So in `[A(2), B(1), C(2)]`,
+A always runs alone — C is never pulled into A's group, even though
+they would happily run together.
+
+**Tap behavior.** Tapping a zone button always appends it to the queue tail.
+The same refill logic then decides whether it can immediately join the
+running group — which it can only if (a) the group has slack *and* (b) the
+queue head fits. A zone already waiting in the queue is never bypassed by a
+later tap. (If you want zone X to run in parallel with what's running now,
+make sure nothing else is queued ahead of X.)
+
+Set `max_parallel = 1` for high-flow zones (lawn sprinklers) that should never
+share the pump. Raise it for low-flow drip lines or small sprinklers that
+together still stay within the pump's flow rate.
 
 ### Backwash sequence
 

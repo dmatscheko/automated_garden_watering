@@ -85,8 +85,12 @@ class StatusSensor(IrrigationBaseEntity, SensorEntity):
         # state/attributes stay stable between transitions and don't flood the
         # recorder with a new row every second.
         rt = self.coordinator.rt
-        active_id = self.coordinator.active_zone_id()
-        active = self.coordinator.zones.get(active_id) if active_id else None
+        active_ids = self.coordinator.active_zone_ids()
+        active_names = [
+            self.coordinator.zones[zid].name
+            for zid in active_ids
+            if zid in self.coordinator.zones
+        ]
         queue_names = [
             self.coordinator.zones[zid].name
             for zid in rt.queue
@@ -95,7 +99,9 @@ class StatusSensor(IrrigationBaseEntity, SensorEntity):
         return {
             "queue": queue_names,
             "queue_length": len(rt.queue),
-            "active_zone": active.name if active else None,
+            "active_zone": active_names[0] if len(active_names) == 1 else None,
+            "active_zones": active_names,
+            "active_count": len(active_names),
             "multiplier": self.coordinator.multiplier,
             "started_by_timer": rt.started_by_timer,
         }
@@ -109,10 +115,39 @@ class ActiveZoneSensor(IrrigationBaseEntity, SensorEntity):
 
     @property
     def native_value(self) -> str:
-        active_id = self.coordinator.active_zone_id()
-        if active_id and active_id in self.coordinator.zones:
-            return self.coordinator.zones[active_id].name
-        return "none"
+        active_ids = self.coordinator.active_zone_ids()
+        if not active_ids:
+            return "none"
+        names = [
+            self.coordinator.zones[zid].name
+            for zid in active_ids
+            if zid in self.coordinator.zones
+        ]
+        if not names:
+            return "none"
+        return ", ".join(names)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        active_ids = self.coordinator.active_zone_ids()
+        return {
+            "ids": active_ids,
+            "names": [
+                self.coordinator.zones[zid].name
+                for zid in active_ids
+                if zid in self.coordinator.zones
+            ],
+            "count": len(active_ids),
+            "group_cap": (
+                min(
+                    self.coordinator.zones[zid].max_parallel
+                    for zid in active_ids
+                    if zid in self.coordinator.zones
+                )
+                if active_ids
+                else None
+            ),
+        }
 
 
 class QueueSensor(IrrigationBaseEntity, SensorEntity):
@@ -159,11 +194,17 @@ class CurrentStepRemainingSensor(IrrigationBaseEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         rt = self.coordinator.rt
         attrs = _hms_attrs(self.coordinator.current_step_remaining_seconds())
-        active_id = self.coordinator.active_zone_id()
-        active = self.coordinator.zones.get(active_id) if active_id else None
+        active_ids = self.coordinator.active_zone_ids()
+        names = [
+            self.coordinator.zones[zid].name
+            for zid in active_ids
+            if zid in self.coordinator.zones
+        ]
         attrs["phase"] = rt.state
-        attrs["label"] = active.name if active else (
-            "Backwash" if rt.state in BACKWASH_ACTIVE_STATES else "—"
+        attrs["label"] = (
+            ", ".join(names)
+            if names
+            else ("Backwash" if rt.state in BACKWASH_ACTIVE_STATES else "—")
         )
         return attrs
 

@@ -211,8 +211,8 @@ async def test_mid_cycle_auto_backwash(
     assert coord.rt.state in (
         STATE_BACKWASH_PRESSURE, STATE_BACKWASH, STATE_BACKWASH_FLUSH,
     )
-    # Coordinator preserves z1 at queue[0] so it resumes after backwash.
-    assert coord.rt.queue and coord.rt.queue[0] == "z1"
+    # Coordinator preserves z1 in `paused` so it resumes after backwash.
+    assert "z1" in coord.rt.paused
 
 
 async def test_end_of_queue_backwash_above_threshold(

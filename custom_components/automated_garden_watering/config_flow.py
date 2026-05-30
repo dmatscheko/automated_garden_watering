@@ -22,6 +22,7 @@ from .const import (
     CONF_ZONE_DURATION,
     CONF_ZONE_ENTITY,
     CONF_ZONE_ID,
+    CONF_ZONE_MAX_PARALLEL,
     CONF_ZONE_NAME,
     CONF_ZONE_ORDER,
     CONF_ZONES,
@@ -32,6 +33,7 @@ from .const import (
     DEFAULT_BACKWASH_THRESHOLD,
     DEFAULT_PUMP_DELAY,
     DEFAULT_ZONE_DURATION,
+    DEFAULT_ZONE_MAX_PARALLEL,
     DOMAIN,
 )
 
@@ -141,6 +143,12 @@ def _zone_schema(
             default=zone.get(CONF_ZONE_ORDER, next_order),
         ): selector.NumberSelector(
             selector.NumberSelectorConfig(min=0, max=999, step=1, mode=selector.NumberSelectorMode.BOX)
+        ),
+        vol.Required(
+            CONF_ZONE_MAX_PARALLEL,
+            default=zone.get(CONF_ZONE_MAX_PARALLEL, DEFAULT_ZONE_MAX_PARALLEL),
+        ): selector.NumberSelector(
+            selector.NumberSelectorConfig(min=1, max=10, step=1, mode=selector.NumberSelectorMode.BOX)
         ),
     }
     if allow_delete:

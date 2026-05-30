@@ -32,13 +32,15 @@
           "name": "Anzeigename",
           "entity_id": "Zonenventil-Schalter",
           "duration": "Standard-Bewässerungsdauer (Sekunden)",
-          "order": "Reihenfolge für „Alles bewässern“ (kleiner zuerst)"
+          "order": "Reihenfolge für „Alles bewässern“ (kleiner zuerst)",
+          "max_parallel": "Maximal parallele Zonen (1 = läuft immer allein)"
         },
         "data_description": {
           "name": "Anzeigename, der im Dashboard erscheint.",
           "entity_id": "Die Home-Assistant-Schalter-Entität, die das Ventil dieser Zone öffnet.",
           "duration": "Standardlaufzeit dieser Zone. Effektive Zeit = Dauer × globaler Multiplikator.",
-          "order": "Kleinere Zahlen laufen zuerst. Nutze Lücken (10, 20, 30 …), um späteres Umsortieren zu erleichtern."
+          "order": "Kleinere Zahlen laufen zuerst. Nutze Lücken (10, 20, 30 …), um späteres Umsortieren zu erleichtern.",
+          "max_parallel": "Mit wie vielen Zonen diese gleichzeitig laufen darf. Bei Werten über 1 werden mehrere direkt hintereinander eingereihte Zonen parallel bewässert; das Gruppen-Maximum entspricht dem kleinsten Wert in der Gruppe. Standard 1 = läuft nie parallel mit anderen."
         }
       },
       "zone_more": {
@@ -111,6 +113,7 @@
           "entity_id": "Zonenventil-Schalter",
           "duration": "Standard-Bewässerungsdauer (Sekunden)",
           "order": "Reihenfolge für „Alles bewässern“ (kleiner zuerst)",
+          "max_parallel": "Maximal parallele Zonen (1 = läuft immer allein)",
           "delete_zone": "Diese Zone löschen"
         },
         "data_description": {
@@ -118,6 +121,7 @@
           "entity_id": "Home-Assistant-Schalter-Entität für das Ventil dieser Zone.",
           "duration": "Standardsekunden; effektive Zeit = Dauer × Multiplikator.",
           "order": "Kleinere Zahlen laufen zuerst.",
+          "max_parallel": "Mit wie vielen Zonen diese parallel laufen darf. Das Gruppen-Maximum ist der kleinste Wert unter den parallel laufenden Zonen. Standard 1 = läuft nie parallel.",
           "delete_zone": "Ankreuzen und auf Senden drücken, um diese Zone dauerhaft zu entfernen. Nicht angekreuzt lassen, um deine Änderungen zu speichern."
         }
       }

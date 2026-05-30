@@ -74,17 +74,17 @@ async def test_backwash_while_watering_pauses_active_zone(
     await coord.async_toggle_zone("z1")
     await advance(hass, 3)  # past pump_pressure → WATERING
     assert coord.rt.state == STATE_WATERING
-    paused_remaining = coord.rt.active_remaining
+    paused_remaining = coord.rt.active.get("z1")
     await coord.async_backwash_now()
-    # The active zone is preserved at queue[0]; pending_backwash now set.
-    assert coord.rt.queue and coord.rt.queue[0] == "z1"
+    # The active zone is parked in `paused` until the backwash finishes.
+    assert "z1" in coord.rt.paused
     # Next tick fulfils the pending request and transitions to a backwash phase.
     await advance(hass, 1)
     assert coord.rt.state in (
         STATE_BACKWASH_PRESSURE, STATE_BACKWASH, STATE_BACKWASH_FLUSH,
     )
-    # Queued zone retains its remaining time so it resumes after the wash.
-    assert coord.rt.active_remaining == paused_remaining
+    # Paused zone retains its remaining time so it resumes after the wash.
+    assert coord.rt.paused.get("z1") == paused_remaining
 
 
 async def test_friendly_dt_weekday_and_month(

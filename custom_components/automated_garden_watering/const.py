@@ -14,6 +14,7 @@ class ZoneConfig(TypedDict, total=False):
     name: str
     duration: int
     order: int
+    max_parallel: int
 
 # Config / options keys
 CONF_PUMP = "pump_switch"
@@ -25,6 +26,7 @@ CONF_ZONE_NAME = "name"
 CONF_ZONE_DURATION = "duration"  # seconds
 CONF_ZONE_ORDER = "order"
 CONF_ZONE_ID = "id"
+CONF_ZONE_MAX_PARALLEL = "max_parallel"  # max simultaneous zones this one tolerates
 
 CONF_MULTIPLIER = "multiplier"
 CONF_PUMP_DELAY = "pump_pressure_delay"        # seconds
@@ -48,6 +50,7 @@ DEFAULT_BACKWASH_FLUSH_RUNTIME = 10
 DEFAULT_BACKWASH_INTERVAL = 10 * 60
 DEFAULT_BACKWASH_THRESHOLD = 3 * 60
 DEFAULT_ZONE_DURATION = 5 * 60
+DEFAULT_ZONE_MAX_PARALLEL = 1
 DEFAULT_DAILY_START = "06:00:00"
 DEFAULT_DAILY_TIMER_ENABLED = False
 

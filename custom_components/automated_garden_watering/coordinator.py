@@ -1,4 +1,13 @@
-"""Irrigation coordinator: queue, pump, and backwash state machine."""
+"""Irrigation coordinator: queue, pump, and backwash state machine.
+
+Supports parallel zones via per-zone `max_parallel`. The currently-running set
+is `rt.active` (zone_id → remaining seconds). A zone joins the active set if
+*both* the current group cap (= min max_parallel across active zones) and the
+candidate's own max_parallel allow one more member. When a zone finishes its
+slot is refilled from the queue head as long as the next queued zone fits the
+shrunken group; otherwise we wait for the rest of the group to drain, then a
+fresh group is formed from a clean cap.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -30,6 +39,7 @@ from .const import (
     CONF_ZONE_DURATION,
     CONF_ZONE_ENTITY,
     CONF_ZONE_ID,
+    CONF_ZONE_MAX_PARALLEL,
     CONF_ZONE_NAME,
     CONF_ZONE_ORDER,
     CONF_ZONES,
@@ -42,6 +52,7 @@ from .const import (
     DEFAULT_DAILY_TIMER_ENABLED,
     DEFAULT_MULTIPLIER,
     DEFAULT_PUMP_DELAY,
+    DEFAULT_ZONE_MAX_PARALLEL,
     DOMAIN,
     SIGNAL_UPDATE,
     STATE_BACKWASH,
@@ -64,19 +75,27 @@ class Zone:
     name: str
     duration: int  # seconds
     order: int
+    max_parallel: int = DEFAULT_ZONE_MAX_PARALLEL
 
 
 @dataclass
 class RuntimeState:
     state: str = STATE_IDLE
-    queue: list[str] = field(default_factory=list)  # list of zone ids; queue[0] is active when watering
-    active_remaining: int = 0
+    queue: list[str] = field(default_factory=list)
+    # zone_id -> remaining seconds. Zones in `active` have their valve open
+    # (unless we're paused for a backwash — then valves are closed but the
+    # remaining counter is preserved).
+    active: dict[str, int] = field(default_factory=dict)
+    # When a backwash interrupts watering, this is the snapshot of remaining
+    # seconds we restore on `_after_backwash`.
+    paused: dict[str, int] = field(default_factory=dict)
     phase_remaining: int = 0  # seconds left in current pump/backwash phase
-    accumulated_watering: int = 0  # total seconds of watering since queue start
-    since_last_backwash: int = 0  # seconds of watering since last backwash
+    accumulated_watering: int = 0  # wall-clock seconds with ≥1 zone running
+    since_last_backwash: int = 0   # wall-clock seconds since last backwash
     started_by_timer: bool = False
     pending_backwash: bool = False
-    multiplier: float = DEFAULT_MULTIPLIER  # multiplier captured at queue start
+    multiplier: float = DEFAULT_MULTIPLIER
+    pump_pressure_done: bool = False  # True once initial pump_delay has elapsed
 
 
 class IrrigationCoordinator:
@@ -113,6 +132,10 @@ class IrrigationCoordinator:
                 name=z[CONF_ZONE_NAME],
                 duration=int(z.get(CONF_ZONE_DURATION) or 0),
                 order=int(z.get(CONF_ZONE_ORDER) or 0),
+                max_parallel=max(
+                    1,
+                    int(z.get(CONF_ZONE_MAX_PARALLEL) or DEFAULT_ZONE_MAX_PARALLEL),
+                ),
             )
         self.zones = zones
         self.pump_switch: str | None = data.get(CONF_PUMP) or None
@@ -146,9 +169,28 @@ class IrrigationCoordinator:
             return None
 
     def active_zone_id(self) -> str | None:
-        if self.rt.state == STATE_WATERING and self.rt.queue:
-            return self.rt.queue[0]
-        return None
+        """Legacy accessor: a single representative running zone or None.
+
+        Returns the running zone with the most remaining seconds — the one that
+        the group ends on — so single-zone consumers still see a sensible value
+        when multiple zones run in parallel. New code should use
+        `active_zone_ids()` instead.
+        """
+        if self.rt.state != STATE_WATERING or not self.rt.active:
+            return None
+        return max(self.rt.active.items(), key=lambda kv: kv[1])[0]
+
+    def active_zone_ids(self) -> list[str]:
+        """All zones currently being watered, in queue order."""
+        return [zid for zid in self.rt.queue if zid in self.rt.active] + [
+            zid for zid in self.rt.active if zid not in self.rt.queue
+        ]
+
+    def _group_cap(self) -> int:
+        """Lowest max_parallel across currently-active zones (∞ if empty)."""
+        if not self.rt.active:
+            return 999
+        return min(self.zones[zid].max_parallel for zid in self.rt.active if zid in self.zones)
 
     def _zone_full_seconds(self, zone_id: str) -> int:
         zone = self.zones.get(zone_id)
@@ -159,13 +201,14 @@ class IrrigationCoordinator:
     def current_step_remaining_seconds(self) -> int:
         """Seconds left in the current step.
 
-        Watering -> remaining of the active zone.
+        Watering -> max remaining of any active zone (i.e., when the running
+        set will be empty if nothing refills).
         Backwash / pressure phases -> remaining of that phase.
         Idle -> 0.
         """
         rt = self.rt
-        if rt.state == STATE_WATERING:
-            return max(0, rt.active_remaining)
+        if rt.state == STATE_WATERING and rt.active:
+            return max(rt.active.values())
         if rt.state == STATE_PUMP_PRESSURE or rt.state in BACKWASH_ACTIVE_STATES:
             return max(0, rt.phase_remaining)
         return 0
@@ -173,26 +216,75 @@ class IrrigationCoordinator:
     def queue_remaining_seconds(self) -> int:
         """Total watering seconds left for the whole queue.
 
-        Excludes backwash time, so the value naturally pauses (stays constant)
-        while a backwash is running because the active zone's remaining time is
-        frozen during the pause.
+        Excludes backwash time. Models parallel groups by simulating group
+        formation from the queue head: each group's contribution is the max
+        zone duration in that group (they water concurrently).
         """
         rt = self.rt
-        if rt.state == STATE_IDLE or not rt.queue:
+        if rt.state == STATE_IDLE:
             return 0
+
         total = 0
-        # Active / first zone.
-        if rt.state == STATE_WATERING:
-            total += max(0, rt.active_remaining)
-        elif rt.active_remaining > 0:
-            # Paused mid-zone (during a backwash) — keep its remaining time.
-            total += rt.active_remaining
-        else:
-            # Not started yet (pump pressure build-up) — full duration.
-            total += self._zone_full_seconds(rt.queue[0])
-        # Remaining queued zones run their full duration.
-        for zid in rt.queue[1:]:
-            total += self._zone_full_seconds(zid)
+        # Active group: parallel runtime is the longest remaining.
+        if rt.active:
+            if any(v > 0 for v in rt.active.values()):
+                total += max(rt.active.values())
+            elif rt.queue:
+                # Paused mid-backwash with all counters at 0 shouldn't happen;
+                # if it does, fall back to a fresh start of the head zone.
+                total += self._zone_full_seconds(rt.queue[0])
+        elif rt.state != STATE_IDLE and rt.queue:
+            # Pump-pressure phase: the head group hasn't started yet. Take its
+            # full duration as the first group's contribution.
+            head_zone = self.zones.get(rt.queue[0])
+            head_cap = head_zone.max_parallel if head_zone else 1
+            total += self._simulate_group_duration(rt.queue, 0, head_cap)[0]
+            # Skip past the simulated head group below.
+            i = self._simulate_group_duration(rt.queue, 0, head_cap)[1]
+            total += self._simulate_remaining_groups(rt.queue, i)
+            return total
+
+        # Future groups (queued zones not yet in the active set):
+        queued = [zid for zid in rt.queue if zid not in rt.active]
+        total += self._simulate_remaining_groups(queued, 0)
+        return total
+
+    def _simulate_group_duration(
+        self, queue: list[str], start: int, initial_cap: int
+    ) -> tuple[int, int]:
+        """Return (group_max_duration_seconds, next_index_after_group)."""
+        if start >= len(queue):
+            return 0, start
+        first = self.zones.get(queue[start])
+        if not first:
+            return 0, start + 1
+        cap = min(initial_cap, first.max_parallel)
+        group_size = 1
+        durations = [self._zone_full_seconds(first.id)]
+        j = start + 1
+        while j < len(queue) and group_size < cap:
+            cand = self.zones.get(queue[j])
+            if cand is None:
+                j += 1
+                continue
+            if group_size + 1 > cand.max_parallel:
+                break
+            durations.append(self._zone_full_seconds(cand.id))
+            cap = min(cap, cand.max_parallel)
+            group_size += 1
+            j += 1
+        return max(durations), j
+
+    def _simulate_remaining_groups(self, queue: list[str], start: int) -> int:
+        total = 0
+        i = start
+        while i < len(queue):
+            first = self.zones.get(queue[i])
+            if not first:
+                i += 1
+                continue
+            dur, i = self._simulate_group_duration(queue, i, first.max_parallel)
+            total += dur
         return total
 
     @callback
@@ -214,8 +306,13 @@ class IrrigationCoordinator:
         for z in self.zones.values():
             await self._switch(z.entity_id, False)
 
+    async def _close_active_valves(self) -> None:
+        for zid in list(self.rt.active):
+            zone = self.zones.get(zid)
+            if zone:
+                await self._switch(zone.entity_id, False)
+
     async def _pump_on(self) -> None:
-        """Turn the pump on and record the run time."""
         await self._switch(self.pump_switch, True)
         self.pump_last_run = dt_util.now()
         self._persist_last_run()
@@ -266,16 +363,11 @@ class IrrigationCoordinator:
         )
 
     async def async_set_details_visible(self, value: bool) -> None:
-        """UI-only toggle for showing the details card on the dashboard."""
         self.details_visible = bool(value)
         self._persist_last_run()
         self._notify()
 
     def _friendly_dt(self, dt: datetime | None) -> str | None:
-        """'Today 14:30' / 'Yesterday 09:00' / 'Mon 09:00' / 'May 03'.
-
-        Localized to German when Home Assistant's language is German.
-        """
         if not dt:
             return None
         local = dt_util.as_local(dt)
@@ -318,7 +410,6 @@ class IrrigationCoordinator:
         if self._daily_unsub:
             self._daily_unsub()
             self._daily_unsub = None
-        # Best-effort safe shutdown
         await self._close_all_zone_valves()
         await self._switch(self.backwash_switch, False)
         await self._switch(self.pump_switch, False)
@@ -356,7 +447,7 @@ class IrrigationCoordinator:
 
     async def _tick_locked(self) -> None:
         rt = self.rt
-        # Honor pending backwash request only when safe (not in a backwash phase already)
+        # Honor pending backwash request when safe.
         if rt.pending_backwash and rt.state in (STATE_WATERING, STATE_PUMP_PRESSURE, STATE_IDLE):
             rt.pending_backwash = False
             await self._enter_backwash_pressure(triggered_during_run=(rt.state != STATE_IDLE))
@@ -364,114 +455,172 @@ class IrrigationCoordinator:
 
         if rt.state == STATE_IDLE:
             if rt.queue:
-                await self._pump_on()
-                rt.state = STATE_PUMP_PRESSURE
-                rt.phase_remaining = max(0, self.pump_delay)
-                if rt.phase_remaining == 0:
-                    await self._start_active_zone()
+                if not rt.pump_pressure_done:
+                    await self._pump_on()
+                    rt.state = STATE_PUMP_PRESSURE
+                    rt.phase_remaining = max(0, self.pump_delay)
+                    if rt.phase_remaining == 0:
+                        rt.pump_pressure_done = True
+                        await self._start_group_from_queue()
+                else:
+                    # Subsequent groups within the same queue start without pump delay.
+                    await self._start_group_from_queue()
             return
 
         if rt.state == STATE_PUMP_PRESSURE:
             rt.phase_remaining -= 1
             if rt.phase_remaining <= 0:
+                rt.pump_pressure_done = True
                 if rt.queue:
-                    await self._start_active_zone()
+                    await self._start_group_from_queue()
                 else:
                     await self._finish_queue()
             return
 
         if rt.state == STATE_WATERING:
-            rt.active_remaining -= 1
+            # Decrement each active zone, finish those that hit 0.
             rt.accumulated_watering += 1
             rt.since_last_backwash += 1
-            # Mid-cycle auto backwash
+            finished: list[str] = []
+            for zid in list(rt.active):
+                rt.active[zid] -= 1
+                if rt.active[zid] <= 0:
+                    finished.append(zid)
+            for zid in finished:
+                zone = self.zones.get(zid)
+                if zone:
+                    await self._switch(zone.entity_id, False)
+                del rt.active[zid]
+                if zid in rt.queue:
+                    rt.queue.remove(zid)
+
+            # Mid-cycle auto-backwash trigger (only when at least one zone is
+            # still running so we have something to resume).
             if (
                 self.backwash_interval > 0
                 and self.backwash_switch
                 and rt.since_last_backwash >= self.backwash_interval
-                and rt.active_remaining > 0
+                and rt.active
             ):
-                # Pause active zone, keep it at queue[0]
-                if rt.queue:
-                    zone = self.zones.get(rt.queue[0])
-                    if zone:
-                        await self._switch(zone.entity_id, False)
+                await self._close_active_valves()
+                rt.paused = dict(rt.active)
+                rt.active.clear()
                 await self._enter_backwash_pressure(triggered_during_run=True)
                 return
-            if rt.active_remaining <= 0:
-                # Zone finished
-                if rt.queue:
-                    zone = self.zones.get(rt.queue[0])
-                    if zone:
-                        await self._switch(zone.entity_id, False)
-                    rt.queue.pop(0)
-                if rt.queue:
-                    await self._start_active_zone()
-                else:
-                    await self._maybe_end_of_queue_backwash()
+
+            # Refill any free slots from the queue head, respecting the cap.
+            await self._refill_active_set()
+
+            if not rt.active and not rt.queue:
+                await self._maybe_end_of_queue_backwash()
+                return
+            if not rt.active and rt.queue:
+                # Active group ended but queued zones remain (none could join
+                # the previous cap). Form a fresh group.
+                await self._start_group_from_queue()
             return
 
         if rt.state == STATE_BACKWASH_PRESSURE:
-            # Pump on, valves closed, pressure building up.
             rt.phase_remaining -= 1
             if rt.phase_remaining <= 0:
                 await self._begin_reverse_flow()
             return
 
         if rt.state == STATE_BACKWASH:
-            # Reverse-flow phase: pump OFF, backwash valve open. The built-up
-            # pressure pushes water backwards through the filter, dislodging dirt.
             rt.phase_remaining -= 1
             if rt.phase_remaining <= 0:
-                # Pump back on to flush the dislodged dirt out.
                 await self._pump_on()
                 rt.state = STATE_BACKWASH_FLUSH
                 rt.phase_remaining = max(1, self.backwash_flush_runtime)
             return
 
         if rt.state == STATE_BACKWASH_FLUSH:
-            # Pump ON, backwash valve still open: flush dislodged dirt away.
             rt.phase_remaining -= 1
             if rt.phase_remaining <= 0:
                 await self._after_backwash()
             return
 
-    async def _start_active_zone(self) -> None:
+    async def _start_group_from_queue(self) -> None:
+        """Pull zones from the queue head into rt.active, forming a new group."""
         rt = self.rt
         if not rt.queue:
             await self._finish_queue()
             return
-        zone = self.zones.get(rt.queue[0])
-        if not zone:
-            rt.queue.pop(0)
-            await self._start_active_zone()
+        # Snapshot the queue order — `_open_zone` removes opened zones from
+        # rt.queue, so iterating by index against the live queue would skip
+        # entries.
+        queue_snapshot = list(rt.queue)
+        # First zone in queue seeds the group.
+        head = self.zones.get(queue_snapshot[0])
+        if not head:
+            if queue_snapshot[0] in rt.queue:
+                rt.queue.remove(queue_snapshot[0])
+            await self._start_group_from_queue()
             return
-        # If we're resuming a paused zone, active_remaining is already > 0 — keep it.
-        if rt.active_remaining <= 0:
-            rt.active_remaining = max(1, int(round(zone.duration * rt.multiplier)))
-            # Fresh start of this zone (not a backwash resume) -> record last run.
+        cap = head.max_parallel
+        await self._open_zone(head)
+        # Add followers while they fit.
+        for zid in queue_snapshot[1:]:
+            if len(rt.active) >= cap:
+                break
+            cand = self.zones.get(zid)
+            if cand is None:
+                if zid in rt.queue:
+                    rt.queue.remove(zid)
+                continue
+            if len(rt.active) + 1 > cand.max_parallel:
+                break
+            cap = min(cap, cand.max_parallel)
+            await self._open_zone(cand)
+        rt.state = STATE_WATERING
+
+    async def _open_zone(self, zone: Zone) -> None:
+        """Open one zone's valve, register it as active, and record last_run."""
+        rt = self.rt
+        if zone.id not in rt.active:
+            rt.active[zone.id] = max(1, int(round(zone.duration * rt.multiplier)))
             self.last_run[zone.id] = dt_util.now()
             self._persist_last_run()
         await self._switch(zone.entity_id, True)
-        rt.state = STATE_WATERING
+        # Remove from queue (where queueing model lives) — the active dict is
+        # the source of truth while running.
+        if zone.id in rt.queue:
+            rt.queue.remove(zone.id)
+
+    async def _refill_active_set(self) -> None:
+        """After a zone finishes, try to pull queued zones into the running set.
+
+        Respects the current group cap (min max_parallel among still-running
+        zones) and the candidate's own max_parallel.
+        """
+        rt = self.rt
+        while rt.queue and rt.active:
+            cap = self._group_cap()
+            if len(rt.active) >= cap:
+                return
+            cand = self.zones.get(rt.queue[0])
+            if cand is None:
+                rt.queue.pop(0)
+                continue
+            if len(rt.active) + 1 > cand.max_parallel:
+                return
+            await self._open_zone(cand)
 
     async def _enter_backwash_pressure(self, triggered_during_run: bool) -> None:
         """Start a backwash. Sequence:
 
-        1. Close all zone valves, pump ON, wait `backwash_delay` (build pressure).
-        2. Pump OFF + open backwash valve, wait `backwash_runtime` (reverse flow).
-        3. Pump ON, wait `backwash_flush_runtime` (flush out dirt).
-        4. Close backwash valve, resume watering or finish.
+        1. Close all zone valves, pump ON, wait `backwash_delay`.
+        2. Pump OFF + open backwash valve, wait `backwash_runtime` (reverse).
+        3. Pump ON, wait `backwash_flush_runtime` (flush).
+        4. Close backwash valve, resume any paused zones or finish.
         """
         rt = self.rt
         if not self.backwash_switch:
-            # No backwash configured — skip straight back to watering/finish.
-            if rt.queue:
-                await self._start_active_zone()
+            if rt.queue or rt.active:
+                await self._start_group_from_queue()
             else:
                 await self._finish_queue()
             return
-        # Build pressure with the pump on and all zone valves closed.
         self.backwash_last_run = dt_util.now()
         self._persist_last_run()
         await self._pump_on()
@@ -482,11 +631,6 @@ class IrrigationCoordinator:
             await self._begin_reverse_flow()
 
     async def _begin_reverse_flow(self) -> None:
-        """Pressure is built: turn the pump OFF, then open the backwash valve.
-
-        With the pump off, the built-up pressure flows backwards through the
-        filter (the pump would otherwise fight against that reverse flow).
-        """
         rt = self.rt
         await self._switch(self.pump_switch, False)
         await self._switch(self.backwash_switch, True)
@@ -494,13 +638,22 @@ class IrrigationCoordinator:
         rt.phase_remaining = max(1, self.backwash_runtime)
 
     async def _after_backwash(self) -> None:
-        """Close the backwash valve and resume watering, or finish."""
         rt = self.rt
         await self._switch(self.backwash_switch, False)
         rt.since_last_backwash = 0
-        if rt.queue:
-            # Resumes a paused zone (active_remaining > 0) or starts the next one.
-            await self._start_active_zone()
+        if rt.paused:
+            # Resume every paused zone (their valves re-open, remaining counters
+            # picked up where they left off).
+            for zid, remaining in rt.paused.items():
+                zone = self.zones.get(zid)
+                if zone:
+                    rt.active[zid] = remaining
+                    await self._switch(zone.entity_id, True)
+            rt.paused.clear()
+            await self._refill_active_set()
+            rt.state = STATE_WATERING
+        elif rt.queue:
+            await self._start_group_from_queue()
         else:
             await self._finish_queue()
 
@@ -520,42 +673,50 @@ class IrrigationCoordinator:
         await self._switch(self.pump_switch, False)
         self.rt = RuntimeState()
 
-    # ---------- public actions (called by entities/services) ----------
+    # ---------- public actions ----------
 
     async def async_toggle_zone(self, zone_id: str) -> None:
         async with self._lock:
             if zone_id not in self.zones:
                 return
             rt = self.rt
-            if zone_id in rt.queue:
-                position = rt.queue.index(zone_id)
-                if position == 0 and rt.state == STATE_WATERING:
-                    # Currently active — stop and advance
-                    zone = self.zones.get(zone_id)
-                    if zone:
-                        await self._switch(zone.entity_id, False)
-                    rt.queue.pop(0)
-                    rt.active_remaining = 0
-                    if rt.queue:
-                        await self._start_active_zone()
-                    else:
-                        await self._maybe_end_of_queue_backwash()
+            zone = self.zones[zone_id]
+            # Currently running? Turn it off and remove from active set.
+            if zone_id in rt.active:
+                await self._switch(zone.entity_id, False)
+                del rt.active[zone_id]
+                if not rt.active and not rt.queue:
+                    await self._maybe_end_of_queue_backwash()
+                elif not rt.active and rt.queue:
+                    await self._start_group_from_queue()
                 else:
-                    rt.queue.pop(position)
-                    if not rt.queue and rt.state == STATE_IDLE:
-                        await self._finish_queue()
+                    # Other zones still running; try to refill.
+                    await self._refill_active_set()
+            # Queued (but not active)? Dequeue.
+            elif zone_id in rt.queue:
+                rt.queue.remove(zone_id)
+                if not rt.queue and not rt.active and rt.state == STATE_IDLE:
+                    await self._finish_queue()
             else:
+                # Newly added — always append to the queue. The unified
+                # `_refill_active_set` then promotes from the queue head if and
+                # only if (a) the running group has slack and (b) the queue
+                # head fits. That keeps tap-to-add adjacency-honoring: a zone
+                # already waiting in the queue is never bypassed by a later
+                # tap, even if the tap on its own would fit the running group.
                 if rt.state == STATE_IDLE:
                     rt.multiplier = self.multiplier
                     rt.started_by_timer = False
                 rt.queue.append(zone_id)
+                if rt.state == STATE_WATERING and rt.active:
+                    await self._refill_active_set()
         self._notify()
 
     async def async_water_all(self, from_timer: bool = False) -> None:
         async with self._lock:
             rt = self.rt
-            if rt.queue or rt.state != STATE_IDLE:
-                # Emergency stop (no backwash)
+            if rt.queue or rt.active or rt.state != STATE_IDLE:
+                # Emergency stop (no backwash).
                 await self._close_all_zone_valves()
                 await self._switch(self.backwash_switch, False)
                 await self._switch(self.pump_switch, False)
@@ -573,25 +734,18 @@ class IrrigationCoordinator:
             rt = self.rt
             if rt.state in BACKWASH_ACTIVE_STATES:
                 return
-            # If currently watering, close the active valve and pause
-            if rt.state == STATE_WATERING and rt.queue:
-                zone = self.zones.get(rt.queue[0])
-                if zone:
-                    await self._switch(zone.entity_id, False)
+            # If currently watering, pause every active valve.
+            if rt.state == STATE_WATERING and rt.active:
+                await self._close_active_valves()
+                rt.paused = dict(rt.active)
+                rt.active.clear()
             rt.pending_backwash = True
-            # If idle, we still need to spin up the pump first; handled in tick via pending flag
             if rt.state == STATE_IDLE:
-                # Kick: turn pump on, enter backwash pressure
                 rt.pending_backwash = False
                 await self._enter_backwash_pressure(triggered_during_run=False)
         self._notify()
 
     async def async_manual_pump(self, on: bool) -> bool:
-        """Manually drive the pump. Returns False if the request was refused.
-
-        Turning the pump off is refused while a queue/backwash is active so the
-        safety invariant (pump on before any valve) cannot be broken manually.
-        """
         if not self.pump_switch:
             return False
         if not on and self.rt.state != STATE_IDLE:
@@ -609,7 +763,6 @@ class IrrigationCoordinator:
 
     async def async_set_multiplier(self, value: float) -> None:
         self.multiplier = max(0.0, float(value))
-        # Persist in entry data
         entries = self.hass.config_entries.async_entries(DOMAIN)
         for entry in entries:
             if entry.entry_id == self.entry_id:

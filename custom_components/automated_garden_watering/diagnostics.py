@@ -27,7 +27,8 @@ async def async_get_config_entry_diagnostics(
         "coordinator": {
             "state": rt.state,
             "queue": list(rt.queue),
-            "active_remaining": rt.active_remaining,
+            "active": dict(rt.active),
+            "paused": dict(rt.paused),
             "phase_remaining": rt.phase_remaining,
             "accumulated_watering": rt.accumulated_watering,
             "since_last_backwash": rt.since_last_backwash,
@@ -46,6 +47,7 @@ async def async_get_config_entry_diagnostics(
                     "name": z.name,
                     "duration": z.duration,
                     "order": z.order,
+                    "max_parallel": z.max_parallel,
                     "last_run": (
                         last_run.isoformat()
                         if (last_run := coordinator.zone_last_run(z.id))

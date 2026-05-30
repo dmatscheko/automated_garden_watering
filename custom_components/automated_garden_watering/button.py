@@ -147,7 +147,7 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
         if not zone:
             return {}
         position = self.coordinator.zone_position_in_queue(self._zone_id)
-        is_active = self.coordinator.active_zone_id() == self._zone_id
+        is_active = self._zone_id in rt.active
         status = "idle"
         if is_active:
             status = "running"
@@ -157,11 +157,12 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
         return {
             "zone_name": zone.name,
             "default_duration_seconds": zone.duration,
+            "max_parallel": zone.max_parallel,
             "run_order": zone.order,
             "queue_position": position,
             "is_active": is_active,
             "status": status,
-            "remaining_seconds": rt.active_remaining if is_active else None,
+            "remaining_seconds": rt.active.get(self._zone_id) if is_active else None,
             "last_run": last_run.isoformat() if last_run else None,
             "last_run_friendly": self.coordinator.zone_last_run_friendly(self._zone_id),
         }
