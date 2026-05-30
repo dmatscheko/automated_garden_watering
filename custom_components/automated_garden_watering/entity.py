@@ -19,8 +19,8 @@ class IrrigationBaseEntity(Entity):
         self._attr_name = name
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.entry_id)},
-            name="Garden Irrigation",
-            manufacturer="Garden Irrigation",
+            name="Automated Garden Watering",
+            manufacturer="Automated Garden Watering",
             model="Queue Controller",
         )
 

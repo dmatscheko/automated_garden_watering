@@ -1,0 +1,13 @@
+{
+  "domain": "automated_garden_watering",
+  "name": "Automated Garden Watering",
+  "version": "0.5.0",
+  "config_flow": true,
+  "integration_type": "service",
+  "iot_class": "local_push",
+  "codeowners": ["@dmatscheko"],
+  "dependencies": [],
+  "requirements": [],
+  "documentation": "https://github.com/dmatscheko/automated_garden_watering",
+  "issue_tracker": "https://github.com/dmatscheko/automated_garden_watering/issues"
+}

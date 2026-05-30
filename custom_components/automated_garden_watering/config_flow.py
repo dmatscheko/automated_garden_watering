@@ -1,6 +1,9 @@
-"""Config & options flow for Garden Irrigation."""
+"""Config & options flow for Automated Garden Watering."""
 from __future__ import annotations
 
+import json
+import logging
+import os
 import uuid
 from typing import Any
 
@@ -33,6 +36,20 @@ from .const import (
     DEFAULT_ZONE_DURATION,
     DOMAIN,
 )
+
+_LOGGER = logging.getLogger(__name__)
+
+# The export button writes one of these filenames to <config>/. The restore
+# step looks for both, so users who exported from the v0.x "Garden Irrigation"
+# integration can import their backup directly.
+DEFAULT_EXPORT_FILENAMES = (
+    "automated_garden_watering_export.json",
+    "garden_irrigation_export.json",
+)
+EXPORT_SCHEMA_VERSION = 1
+# Marker the restore step writes into entry.data; __init__.py consumes it on
+# setup to seed the integration's Store with the migrated last-run history.
+IMPORT_STATE_KEY = "__import_state__"
 
 # Transient form-only field (not persisted) used to delete a zone from its
 # edit screen instead of from the zone list.
@@ -150,7 +167,7 @@ def _zone_schema(
     return vol.Schema(schema)
 
 
-class GardenIrrigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class AutomatedGardenWateringConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Initial setup flow."""
 
     VERSION = 1
@@ -158,22 +175,32 @@ class GardenIrrigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._globals: dict[str, Any] = {}
         self._zones: list[dict[str, Any]] = []
+        self._import_payload: dict[str, Any] | None = None
 
     @staticmethod
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> "GardenIrrigationOptionsFlow":
-        return GardenIrrigationOptionsFlow(config_entry)
+    ) -> "AutomatedGardenWateringOptionsFlow":
+        return AutomatedGardenWateringOptionsFlow(config_entry)
+
+    # ---------- entry point: pick "new setup" or "import from backup" ----------
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["new_setup", "restore"],
+        )
+
+    # ---------- new setup ----------
+
+    async def async_step_new_setup(self, user_input: dict[str, Any] | None = None):
         if user_input is not None:
             self._globals = user_input
             return await self.async_step_zone()
         return self.async_show_form(
-            step_id="user",
+            step_id="new_setup",
             data_schema=_global_schema({}),
-            description_placeholders={},
         )
 
     async def async_step_zone(self, user_input: dict[str, Any] | None = None):
@@ -196,7 +223,9 @@ class GardenIrrigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data[CONF_ZONES] = self._zones
             await self.async_set_unique_id(DOMAIN)
             self._abort_if_unique_id_configured()
-            return self.async_create_entry(title="Garden Irrigation", data=data)
+            return self.async_create_entry(
+                title="Automated Garden Watering", data=data
+            )
         return self.async_show_form(
             step_id="zone_more",
             data_schema=vol.Schema(
@@ -205,8 +234,130 @@ class GardenIrrigationConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={"count": str(len(self._zones))},
         )
 
+    # ---------- import from backup ----------
 
-class GardenIrrigationOptionsFlow(config_entries.OptionsFlow):
+    async def async_step_restore(self, user_input: dict[str, Any] | None = None):
+        """Ask the user where the backup file lives, then validate it."""
+        default_path = self._guess_export_path()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            path = user_input["path"]
+            payload, err = await self.hass.async_add_executor_job(
+                _read_export_file, path
+            )
+            if err:
+                errors["base"] = err
+            elif payload is None:
+                errors["base"] = "invalid_format"
+            else:
+                self._import_payload = payload
+                self._import_payload["__source_path__"] = path
+                return await self.async_step_restore_confirm()
+
+        return self.async_show_form(
+            step_id="restore",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        "path",
+                        default=default_path,
+                    ): selector.TextSelector(),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "default_path": default_path or "(none found)",
+            },
+        )
+
+    async def async_step_restore_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Show a summary of the imported file and create the entry on confirm."""
+        if self._import_payload is None:
+            return await self.async_step_restore()
+
+        config = self._import_payload.get("config") or {}
+        state = self._import_payload.get("state") or {}
+        zones = config.get(CONF_ZONES) or []
+
+        if user_input is not None:
+            await self.async_set_unique_id(DOMAIN)
+            self._abort_if_unique_id_configured()
+            data = dict(config)
+            data[IMPORT_STATE_KEY] = state  # __init__.py consumes this on setup
+            return self.async_create_entry(
+                title="Automated Garden Watering", data=data
+            )
+
+        zone_lines = "\n".join(
+            f"  • #{int(z.get(CONF_ZONE_ORDER, 0))} {z.get(CONF_ZONE_NAME, '?')} "
+            f"({z.get(CONF_ZONE_ENTITY, '?')})"
+            for z in sorted(
+                zones,
+                key=lambda z: (
+                    z.get(CONF_ZONE_ORDER, 0),
+                    z.get(CONF_ZONE_NAME, ""),
+                ),
+            )
+        ) or "  (none)"
+        last_run_count = len(state.get("last_run") or {})
+        return self.async_show_form(
+            step_id="restore_confirm",
+            data_schema=vol.Schema(
+                {vol.Required("confirm", default=True): selector.BooleanSelector()}
+            ),
+            description_placeholders={
+                "source_domain": str(
+                    self._import_payload.get("source_domain", "?")
+                ),
+                "exported_at": str(
+                    self._import_payload.get("exported_at", "?")
+                ),
+                "source_path": str(
+                    self._import_payload.get("__source_path__", "?")
+                ),
+                "zone_count": str(len(zones)),
+                "zones": zone_lines,
+                "last_run_count": str(last_run_count),
+            },
+        )
+
+    def _guess_export_path(self) -> str:
+        """Return the most plausible existing backup file path, else the default."""
+        for name in DEFAULT_EXPORT_FILENAMES:
+            candidate = self.hass.config.path(name)
+            if os.path.isfile(candidate):
+                return candidate
+        return self.hass.config.path(DEFAULT_EXPORT_FILENAMES[0])
+
+
+def _read_export_file(path: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Load + minimally validate an export file. Runs in the executor.
+
+    Returns (payload, error_key). On success error_key is None. On failure the
+    error key matches one of the config flow's translated error strings.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+    except FileNotFoundError:
+        return None, "file_not_found"
+    except (OSError, json.JSONDecodeError) as err:
+        _LOGGER.warning("Could not read backup %s: %s", path, err)
+        return None, "invalid_format"
+
+    if not isinstance(payload, dict):
+        return None, "invalid_format"
+    if payload.get("schema_version") != EXPORT_SCHEMA_VERSION:
+        return None, "unsupported_version"
+    if not isinstance(payload.get("config"), dict):
+        return None, "invalid_format"
+    return payload, None
+
+
+class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
     """Options flow: edit globals, add/edit/remove zones."""
 
     def __init__(self, entry: config_entries.ConfigEntry) -> None:

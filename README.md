@@ -1,4 +1,4 @@
-# Garden Irrigation — Home Assistant Custom Integration
+# Automated Garden Watering — Home Assistant Custom Integration
 
 A Home Assistant integration for garden irrigation with a queue-based watering controller, well pump and backwash valve coordination, automatic mid-cycle and end-of-cycle backwash, a daily timer, and a global watering multiplier.
 
@@ -18,9 +18,28 @@ A Home Assistant integration for garden irrigation with a queue-based watering c
 ## Installation (HACS)
 
 1. In HACS → Integrations → ⋮ → *Custom repositories*, add this repo's URL with category *Integration*.
-2. Install **Garden Irrigation**.
+2. Install **Automated Garden Watering**.
 3. Restart Home Assistant.
-4. *Settings → Devices & Services → Add Integration → Garden Irrigation*.
+4. *Settings → Devices & Services → Add Integration → Automated Garden Watering*.
+
+## Migrating from the v0.x "Garden Irrigation" integration
+
+This integration was renamed from `garden_irrigation` to `automated_garden_watering`
+in v0.5.0. To bring your existing setup over without losing zones or last-run
+history:
+
+1. **In the old version (v0.4.1):** press *Export configuration* on the
+   integration's device page. A backup file appears at
+   `<config>/garden_irrigation_export.json`.
+2. **Update via HACS** to the new version, then **restart Home Assistant**.
+3. The old integration entry will be orphaned ("not loaded") because its domain
+   no longer exists. Remove it from *Settings → Devices & Services*. (Your
+   backup file is untouched.)
+4. *Add Integration → Automated Garden Watering* → choose **Import from a backup
+   file**. The default path is pre-filled with whichever backup file exists.
+   Confirm — your zones, settings and last-run history are restored.
+5. Press *Generate dashboard YAML* to get a fresh dashboard with the new entity
+   IDs.
 
 ## Configuration
 
@@ -54,21 +73,21 @@ cleans the filter far better than just opening the valve:
 
 | Entity | Description |
 |---|---|
-| `button.garden_irrigation_water_all` | Run all zones in order; pressing again while queue is active = emergency stop. Attribute `running` for coloring. |
-| `button.garden_irrigation_backwash` | Immediate backwash (never queued). Attributes `status` (`running`/`idle`) for coloring and `last_run` / `last_run_friendly` for showing when it last ran (persisted across restarts). |
-| `button.garden_irrigation_zone_<order>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<order>` suffix is the zone's run order, so the buttons sort naturally in the UI. The friendly zone name set during setup is the entity's display name and is also in the `zone_name` attribute. Attributes `last_run` (ISO) and `last_run_friendly` (e.g. `Today 14:30`, `Yesterday 09:00`, `Mon 09:00`, `May 03`) record when the zone last watered (persisted across restarts). |
-| `switch.garden_irrigation_pump_manual` | Manual well-pump control for e.g. a garden hose (only created if a pump is configured). Turning it **off** is blocked while a queue/backwash is active so the pump-first safety rule can't be broken manually. Attributes `status`, `last_run`, `last_run_friendly`, `controlled_by` (`manual`/`automation`) — so it can be shown as a button with a last-run line like the zones. |
-| `button.garden_irrigation_generate_dashboard_yaml` | Config button: generates a complete dashboard YAML for your exact entities/zones and shows it in a notification (also writes `garden_irrigation_dashboard.yaml` to your config folder). |
-| `button.garden_irrigation_export_configuration` | Config button: writes `<config>/garden_irrigation_export.json` with **all** configuration (pump/backwash, zones, timings, multiplier, daily timer) **plus** the last-run history. Use this to back up the integration or to migrate to a renamed/reinstalled version. |
-| `number.garden_irrigation_multiplier` | Global watering multiplier. |
-| `time.garden_irrigation_daily_start` | Daily start time. |
-| `switch.garden_irrigation_daily_timer` | Enable/disable the daily timer. |
-| `switch.garden_irrigation_show_details` | UI-only toggle (no effect on irrigation). The dashboard's *Details* button toggles it, and a `conditional` card reveals the status/timer/multiplier list while it's on. State is remembered across restarts. |
-| `sensor.garden_irrigation_status` | `idle`, `pump_pressure`, `watering`, `backwash_pressure`, `backwash` (reverse flow, pump off), `backwash_flush` (pump on). Slow-changing attributes only (queue, active zone, multiplier) so it doesn't flood the recorder. |
-| `sensor.garden_irrigation_active_zone` | Currently watering zone name (or `none`). |
-| `sensor.garden_irrigation_queue` | Comma-separated upcoming zones. |
-| `sensor.garden_irrigation_current_step_time_remaining` | Countdown (`H:MM:SS`) for the active zone, or the backwash while it runs. Attributes: `hours`, `minutes`, `seconds`, `total_seconds`, `phase`, `label`. Updates every second — see *Database / recorder* below. |
-| `sensor.garden_irrigation_queue_time_remaining` | Countdown (`H:MM:SS`) of all remaining watering in the queue. Pauses (holds steady) during backwash. Attributes: `hours`, `minutes`, `seconds`, `total_seconds`. Updates every second — see *Database / recorder* below. |
+| `button.automated_garden_watering_water_all` | Run all zones in order; pressing again while queue is active = emergency stop. Attribute `running` for coloring. |
+| `button.automated_garden_watering_backwash` | Immediate backwash (never queued). Attributes `status` (`running`/`idle`) for coloring and `last_run` / `last_run_friendly` for showing when it last ran (persisted across restarts). |
+| `button.automated_garden_watering_zone_<order>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<order>` suffix is the zone's run order, so the buttons sort naturally in the UI. The friendly zone name set during setup is the entity's display name and is also in the `zone_name` attribute. Attributes `last_run` (ISO) and `last_run_friendly` (e.g. `Today 14:30`, `Yesterday 09:00`, `Mon 09:00`, `May 03`) record when the zone last watered (persisted across restarts). |
+| `switch.automated_garden_watering_pump_manual` | Manual well-pump control for e.g. a garden hose (only created if a pump is configured). Turning it **off** is blocked while a queue/backwash is active so the pump-first safety rule can't be broken manually. Attributes `status`, `last_run`, `last_run_friendly`, `controlled_by` (`manual`/`automation`) — so it can be shown as a button with a last-run line like the zones. |
+| `button.automated_garden_watering_generate_dashboard_yaml` | Config button: generates a complete dashboard YAML for your exact entities/zones and shows it in a notification (also writes `automated_garden_watering_dashboard.yaml` to your config folder). |
+| `button.automated_garden_watering_export_configuration` | Config button: writes `<config>/automated_garden_watering_export.json` with **all** configuration (pump/backwash, zones, timings, multiplier, daily timer) **plus** the last-run history. Use this to back up the integration or to migrate to a renamed/reinstalled version. |
+| `number.automated_garden_watering_watering_multiplier` | Global watering multiplier. |
+| `time.automated_garden_watering_daily_start_time` | Daily start time. |
+| `switch.automated_garden_watering_daily_timer` | Enable/disable the daily timer. |
+| `switch.automated_garden_watering_show_details` | UI-only toggle (no effect on irrigation). The dashboard's *Details* button toggles it, and a `conditional` card reveals the status/timer/multiplier list while it's on. State is remembered across restarts. |
+| `sensor.automated_garden_watering_status` | `idle`, `pump_pressure`, `watering`, `backwash_pressure`, `backwash` (reverse flow, pump off), `backwash_flush` (pump on). Slow-changing attributes only (queue, active zone, multiplier) so it doesn't flood the recorder. |
+| `sensor.automated_garden_watering_active_zone` | Currently watering zone name (or `none`). |
+| `sensor.automated_garden_watering_queue` | Comma-separated upcoming zones. |
+| `sensor.automated_garden_watering_current_step_time_remaining` | Countdown (`H:MM:SS`) for the active zone, or the backwash while it runs. Attributes: `hours`, `minutes`, `seconds`, `total_seconds`, `phase`, `label`. Updates every second — see *Database / recorder* below. |
+| `sensor.automated_garden_watering_queue_time_remaining` | Countdown (`H:MM:SS`) of all remaining watering in the queue. Pauses (holds steady) during backwash. Attributes: `hours`, `minutes`, `seconds`, `total_seconds`. Updates every second — see *Database / recorder* below. |
 
 ## Database / recorder
 
@@ -90,7 +109,7 @@ recorder:
 
 If you renamed the integration's device, the entity_id prefix differs; the glob
 above still matches because it keys off the `_time_remaining` suffix. To be more
-specific instead, use `sensor.garden_irrigation_*_time_remaining` (adjust the
+specific instead, use `sensor.automated_garden_watering_*_time_remaining` (adjust the
 prefix to your device name).
 
 ## Safety

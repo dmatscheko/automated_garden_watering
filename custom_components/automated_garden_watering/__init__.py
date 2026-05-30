@@ -1,4 +1,4 @@
-"""Garden Irrigation integration."""
+"""Automated Garden Watering integration."""
 from __future__ import annotations
 
 import logging
@@ -8,10 +8,17 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.storage import Store
 from homeassistant.util import slugify
 
 from .const import CONF_ZONE_ID, CONF_ZONE_ORDER, CONF_ZONES, DOMAIN
 from .coordinator import IrrigationCoordinator
+
+# Marker key in entry.data set by the config flow's import step. When seen on
+# setup we pre-write the integration's Store with the imported state so the
+# coordinator restores last-run history just like a regular reload would.
+IMPORT_STATE_KEY = "__import_state__"
+STORAGE_VERSION = 1
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +43,13 @@ def _zone_ids(data: dict) -> set[str]:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # If this entry came from the import flow, pre-seed the integration's Store
+    # so the coordinator's normal load path picks up the migrated last-run
+    # history. Done before creating the coordinator so its async_start() reads
+    # the freshly written store.
+    if IMPORT_STATE_KEY in entry.data:
+        await _consume_import_state(hass, entry)
+
     coordinator = IrrigationCoordinator(hass, entry.entry_id, _merged(entry))
     await coordinator.async_start()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -46,6 +60,34 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(_options_updated))
     return True
+
+
+async def _consume_import_state(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Move an imported state payload from entry.data into the Store.
+
+    Idempotent and one-shot: after writing the Store we drop the marker key
+    from entry.data so a subsequent reload doesn't re-import (and overwrite
+    fresh state with the snapshot from the backup).
+    """
+    state = entry.data.get(IMPORT_STATE_KEY) or {}
+    if isinstance(state, dict) and state:
+        # Same key the coordinator uses for its Store.
+        store: Store = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}")
+        await store.async_save(
+            {
+                "last_run": state.get("last_run") or {},
+                "pump_last_run": state.get("pump_last_run"),
+                "backwash_last_run": state.get("backwash_last_run"),
+                "details_visible": bool(state.get("details_visible", False)),
+            }
+        )
+        _LOGGER.info(
+            "Restored last-run history for %d zone(s) from imported backup",
+            len(state.get("last_run") or {}),
+        )
+
+    new_data = {k: v for k, v in entry.data.items() if k != IMPORT_STATE_KEY}
+    hass.config_entries.async_update_entry(entry, data=new_data)
 
 
 async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -81,7 +123,7 @@ def _device_slug(hass: HomeAssistant, entry: ConfigEntry) -> str:
     name = None
     if device:
         name = device.name_by_user or device.name
-    return slugify(name or "Garden Irrigation")
+    return slugify(name or "Automated Garden Watering")
 
 
 def _sync_zone_entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:

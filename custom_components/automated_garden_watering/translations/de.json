@@ -2,7 +2,15 @@
   "config": {
     "step": {
       "user": {
-        "title": "Gartenbewässerung — globale Einstellungen",
+        "title": "Automatische Gartenbewässerung",
+        "description": "Wie möchtest du diese Integration einrichten?",
+        "menu_options": {
+          "new_setup": "Neu einrichten",
+          "restore": "Aus Sicherungsdatei importieren"
+        }
+      },
+      "new_setup": {
+        "title": "Automatische Gartenbewässerung — globale Einstellungen",
         "description": "Richte deine Pumpe, das Rückspülventil und die Standardzeiten ein. Beide Schalter sind optional — leer lassen, wenn du diese Hardware nicht hast.",
         "data": {
           "pump_switch": "Brunnenpumpen-Schalter (optional)",
@@ -45,16 +53,34 @@
         "title": "Weitere Zone hinzufügen?",
         "description": "Bisher {count} Zone(n) konfiguriert.",
         "data": {"add_another": "Weitere Zone hinzufügen"}
+      },
+      "restore": {
+        "title": "Aus Sicherung importieren",
+        "description": "Pfad zur Sicherungsdatei, die der Knopf *Konfiguration exportieren* erzeugt hat. Dateien aus der bisherigen Integration „Garden Irrigation“ funktionieren ebenfalls.\n\nGefundener Standardpfad: `{default_path}`.",
+        "data": {"path": "Pfad zur Sicherungsdatei"},
+        "data_description": {
+          "path": "Absoluter Pfad oder ein Pfad relativ zum Home-Assistant-Konfigurationsordner."
+        }
+      },
+      "restore_confirm": {
+        "title": "Import bestätigen",
+        "description": "Diese Sicherung wird importiert:\n\n- **Datei:** `{source_path}`\n- **Ursprungs-Integration:** `{source_domain}`\n- **Exportiert am:** {exported_at}\n- **Zonen ({zone_count}):**\n{zones}\n- **Einträge im Verlauf „Zuletzt gelaufen“:** {last_run_count}\n\nLasse *Import bestätigen* angekreuzt und drücke Senden, um die Integration mit diesen Einstellungen anzulegen.",
+        "data": {"confirm": "Import bestätigen"}
       }
     },
+    "error": {
+      "file_not_found": "Unter diesem Pfad wurde keine Datei gefunden.",
+      "invalid_format": "Die Datei ist keine gültige Sicherung — konnte sie nicht als JSON lesen.",
+      "unsupported_version": "Diese Sicherungsdatei verwendet eine Schema-Version, die diese Integration nicht versteht."
+    },
     "abort": {
-      "already_configured": "Die Gartenbewässerung ist bereits eingerichtet. Nutze „Konfigurieren“ am vorhandenen Eintrag, um Einstellungen zu ändern."
+      "already_configured": "Die Automatische Gartenbewässerung ist bereits eingerichtet. Nutze „Konfigurieren“ am vorhandenen Eintrag, um Einstellungen zu ändern."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Gartenbewässerung",
+        "title": "Automatische Gartenbewässerung",
         "description": "Globale Einstellungen bearbeiten oder Zonen verwalten.",
         "menu_options": {
           "globals": "Globale Einstellungen (Pumpe, Rückspülung, Zeiten)",

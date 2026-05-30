@@ -1,12 +1,12 @@
-# Example Lovelace dashboard view for Garden Irrigation.
+# Example Lovelace dashboard view for Automated Garden Watering.
 #
 # TIP: instead of hand-editing this, press the "Generate dashboard YAML" button
-# the integration creates (button.garden_irrigation_generate_dashboard_yaml).
+# the integration creates (button.automated_garden_watering_generate_dashboard_yaml).
 # It produces this same layout pre-filled with your real entity_ids and zones.
 #
 # Paste under "views:" in your dashboard YAML, or use as a starting point in the
 # UI editor. Replace the example zone unique IDs with the ones you actually have
-# in `button.garden_irrigation_zone_*`.
+# in `button.automated_garden_watering_zone_*`.
 #
 # The cards below color buttons by status using the `extra_state_attributes`
 # exposed by each zone button (`status` = idle | queued | running), the backwash
@@ -25,7 +25,7 @@ cards:
         square: false
         cards:
           - type: custom:button-card
-            entity: button.garden_irrigation_water_all
+            entity: button.automated_garden_watering_water_all
             name: Water all / STOP
             icon: mdi:sprinkler-variant
             show_state: false
@@ -37,11 +37,11 @@ cards:
               action: perform-action
               perform_action: button.press
               target:
-                entity_id: button.garden_irrigation_water_all
+                entity_id: button.automated_garden_watering_water_all
             state:
               - operator: template
                 value: >-
-                  [[[ return states['button.garden_irrigation_water_all'].attributes.running === true ]]]
+                  [[[ return states['button.automated_garden_watering_water_all'].attributes.running === true ]]]
                 styles:
                   card:
                     - background-color: '#2e7d32'
@@ -49,7 +49,7 @@ cards:
                   icon:
                     - color: var(--state-switch-active-color, var(--paper-item-icon-active-color, #fdd835))
           - type: custom:button-card
-            entity: switch.garden_irrigation_show_details
+            entity: switch.automated_garden_watering_show_details
             name: Details
             icon: mdi:information-outline
             show_state: false
@@ -65,27 +65,27 @@ cards:
       # Hidden by default; revealed when "Details" (the Show details switch) is on.
       - type: conditional
         conditions:
-          - entity: switch.garden_irrigation_show_details
+          - entity: switch.automated_garden_watering_show_details
             state: 'on'
         card:
           type: entities
           show_header_toggle: false
           entities:
-            - entity: sensor.garden_irrigation_status
+            - entity: sensor.automated_garden_watering_status
               name: Status
-            - entity: sensor.garden_irrigation_current_step_time_remaining
+            - entity: sensor.automated_garden_watering_current_step_time_remaining
               name: Current step time remaining
-            - entity: sensor.garden_irrigation_queue_time_remaining
+            - entity: sensor.automated_garden_watering_queue_time_remaining
               name: Queue time remaining
-            - entity: sensor.garden_irrigation_active_zone
+            - entity: sensor.automated_garden_watering_active_zone
               name: Active zone
-            - entity: sensor.garden_irrigation_queue
+            - entity: sensor.automated_garden_watering_queue
               name: Queue
-            - entity: number.garden_irrigation_watering_multiplier
+            - entity: number.automated_garden_watering_watering_multiplier
               name: Watering multiplier
-            - entity: time.garden_irrigation_daily_start_time
+            - entity: time.automated_garden_watering_daily_start_time
               name: Daily start time
-            - entity: switch.garden_irrigation_daily_timer
+            - entity: switch.automated_garden_watering_daily_timer
               name: Daily timer
 
       # Remaining buttons, same full size: Backwash, Pump, then the zones.
@@ -94,7 +94,7 @@ cards:
         square: false
         cards:
           - type: custom:button-card
-            entity: button.garden_irrigation_backwash
+            entity: button.automated_garden_watering_backwash
             name: Backwash
             icon: mdi:backup-restore
             show_state: false
@@ -107,11 +107,11 @@ cards:
               action: perform-action
               perform_action: button.press
               target:
-                entity_id: button.garden_irrigation_backwash
+                entity_id: button.automated_garden_watering_backwash
             state:
               - operator: template
                 value: >-
-                  [[[ return states['button.garden_irrigation_backwash'].attributes.status === 'running' ]]]
+                  [[[ return states['button.automated_garden_watering_backwash'].attributes.status === 'running' ]]]
                 styles:
                   card:
                     - background-color: '#2e7d32'
@@ -120,7 +120,7 @@ cards:
                     - color: var(--state-switch-active-color, var(--paper-item-icon-active-color, #fdd835))
             label: >-
               [[[
-                const a = states['button.garden_irrigation_backwash'].attributes;
+                const a = states['button.automated_garden_watering_backwash'].attributes;
                 if (a.status === 'running') return 'Running';
                 if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly;
                 return 'Never run';
@@ -128,7 +128,7 @@ cards:
           # Manual pump is a switch -> tap toggles it. Green while on, with a
           # "last run" line when off (like the zone buttons).
           - type: custom:button-card
-            entity: switch.garden_irrigation_pump_manual
+            entity: switch.automated_garden_watering_pump_manual
             name: Pump (manual)
             icon: mdi:water-pump
             show_state: false
@@ -143,7 +143,7 @@ cards:
                     - color: white
             label: >-
               [[[
-                const e = states['switch.garden_irrigation_pump_manual'];
+                const e = states['switch.automated_garden_watering_pump_manual'];
                 if (e.state === 'on') return 'On';
                 if (e.attributes.last_run_friendly) return 'Last: ' + e.attributes.last_run_friendly;
                 return 'Never run';
@@ -151,7 +151,7 @@ cards:
           # Repeat this block for each zone. Color reflects `status` attribute:
           #   idle = default, queued = amber, running = green.
           - type: custom:button-card  # optional; falls back to plain button if not installed
-            entity: button.garden_irrigation_zone_REPLACE_ME
+            entity: button.automated_garden_watering_zone_REPLACE_ME
             name: Zone 1
             icon: mdi:water
             show_state: false
@@ -159,25 +159,25 @@ cards:
               action: perform-action
               perform_action: button.press
               target:
-                entity_id: button.garden_irrigation_zone_REPLACE_ME
+                entity_id: button.automated_garden_watering_zone_REPLACE_ME
             state:
               - operator: template
                 value: >-
-                  [[[ return states['button.garden_irrigation_zone_REPLACE_ME'].attributes.status === 'running' ]]]
+                  [[[ return states['button.automated_garden_watering_zone_REPLACE_ME'].attributes.status === 'running' ]]]
                 styles:
                   card:
                     - background-color: '#2e7d32'
                     - color: white
               - operator: template
                 value: >-
-                  [[[ return states['button.garden_irrigation_zone_REPLACE_ME'].attributes.status === 'queued' ]]]
+                  [[[ return states['button.automated_garden_watering_zone_REPLACE_ME'].attributes.status === 'queued' ]]]
                 styles:
                   card:
                     - background-color: '#ef6c00'
                     - color: white
             label: >-
               [[[
-                const a = states['button.garden_irrigation_zone_REPLACE_ME'].attributes;
+                const a = states['button.automated_garden_watering_zone_REPLACE_ME'].attributes;
                 if (a.status === 'running') return 'Running · ' + Math.max(0, a.remaining_seconds || 0) + 's left';
                 if (a.status === 'queued') return 'Queued #' + a.queue_position;
                 if (a.last_run_friendly) return 'Last: ' + a.last_run_friendly;

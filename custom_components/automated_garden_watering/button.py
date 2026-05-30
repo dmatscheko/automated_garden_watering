@@ -25,9 +25,11 @@ from .entity import IrrigationBaseEntity
 
 _LOGGER = logging.getLogger(__name__)
 
-# Backup file written to <config>/. Kept stable across a future rename so the
-# new integration can find and import it.
-EXPORT_FILENAME = "garden_irrigation_export.json"
+# Backup file the export button writes into <config>/. The legacy filename is
+# what pre-rename users still have on disk from v0.4.1; the importer accepts
+# either, but new exports use the current name.
+EXPORT_FILENAME = "automated_garden_watering_export.json"
+LEGACY_EXPORT_FILENAME = "garden_irrigation_export.json"
 EXPORT_SCHEMA_VERSION = 1
 
 
@@ -102,7 +104,7 @@ class GenerateDashboardButton(IrrigationBaseEntity, ButtonEntity):
         yaml_text = build_dashboard(self.hass, self.coordinator)
 
         # Best-effort: also drop a file next to configuration.yaml.
-        path = self.hass.config.path("garden_irrigation_dashboard.yaml")
+        path = self.hass.config.path("automated_garden_watering_dashboard.yaml")
 
         def _write() -> None:
             with open(path, "w", encoding="utf-8") as fh:
@@ -126,7 +128,7 @@ class GenerateDashboardButton(IrrigationBaseEntity, ButtonEntity):
         async_create_notification(
             self.hass,
             message,
-            title="Garden Irrigation dashboard",
+            title="Automated Garden Watering dashboard",
             notification_id=f"{DOMAIN}_dashboard_{self.coordinator.entry_id}",
         )
 
@@ -198,7 +200,7 @@ class ExportConfigButton(IrrigationBaseEntity, ButtonEntity):
             async_create_notification(
                 self.hass,
                 f"Could not write backup file `{path}`: {err}",
-                title="Garden Irrigation backup failed",
+                title="Automated Garden Watering – backup failed",
                 notification_id=f"{DOMAIN}_export_{self.coordinator.entry_id}",
             )
             return
@@ -216,7 +218,7 @@ class ExportConfigButton(IrrigationBaseEntity, ButtonEntity):
                 "Zeiten wiederherzustellen."
             )
         else:
-            title = "Garden Irrigation backup created"
+            title = "Automated Garden Watering – backup created"
             message = (
                 f"Saved configuration and history to `{path}` "
                 f"({n_zones} zone(s)).\n\n"

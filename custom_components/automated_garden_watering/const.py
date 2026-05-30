@@ -1,7 +1,11 @@
-"""Constants for the Garden Irrigation integration."""
+"""Constants for the Automated Garden Watering integration."""
 from __future__ import annotations
 
-DOMAIN = "garden_irrigation"
+DOMAIN = "automated_garden_watering"
+# Previous domain. Used by the importer to find old backup files and let users
+# migrate from the v0.x "Garden Irrigation" integration without losing zones,
+# settings or last-run history.
+LEGACY_DOMAIN = "garden_irrigation"
 
 # Config / options keys
 CONF_PUMP = "pump_switch"
