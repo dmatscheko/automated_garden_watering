@@ -107,5 +107,78 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "idle": "Idle",
+          "pump_pressure": "Pump pressure build-up",
+          "watering": "Watering",
+          "backwash_pressure": "Backwash pressure build-up",
+          "backwash": "Backwash (reverse flow)",
+          "backwash_flush": "Backwash (flush)"
+        }
+      },
+      "active_zone": {"name": "Active zone"},
+      "queue": {"name": "Queue"},
+      "step_remaining": {"name": "Current step time remaining"},
+      "queue_remaining": {"name": "Queue time remaining"}
+    },
+    "button": {
+      "water_all": {"name": "Water all"},
+      "backwash": {"name": "Backwash"},
+      "dashboard_yaml": {"name": "Dashboard YAML"}
+    },
+    "switch": {
+      "daily_timer": {"name": "Daily timer"},
+      "show_details": {"name": "Show details"},
+      "manual_pump": {"name": "Pump (manual)"}
+    },
+    "number": {
+      "multiplier": {"name": "Watering multiplier"}
+    },
+    "time": {
+      "daily_start": {"name": "Daily start time"}
+    }
+  },
+  "services": {
+    "water_all": {
+      "name": "Water all",
+      "description": "Run every configured zone in run order. Calling this while a queue is active stops the queue (emergency stop)."
+    },
+    "stop": {
+      "name": "Stop",
+      "description": "Stop the current queue and close all valves. No-op when nothing is running."
+    },
+    "backwash": {
+      "name": "Backwash",
+      "description": "Trigger an immediate two-stage backwash (reverse flow followed by flush). Fails if no backwash valve is configured."
+    },
+    "water_zone": {
+      "name": "Water zone",
+      "description": "Queue (or dequeue) a single zone by display name, zone id, or valve entity id.",
+      "fields": {
+        "zone": {
+          "name": "Zone",
+          "description": "Zone display name (case-insensitive), zone id, or the valve's switch entity_id."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Automated Garden Watering is not set up. Add the integration before calling its actions."
+    },
+    "no_backwash_configured": {
+      "message": "No backwash valve is configured for Automated Garden Watering."
+    },
+    "zone_required": {
+      "message": "A zone name, id, or entity_id is required."
+    },
+    "zone_not_found": {
+      "message": "No zone matched '{zone}'. Provide its display name, id, or the valve switch entity_id."
+    }
   }
 }

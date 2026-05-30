@@ -1,23 +1,27 @@
-"""Daily timer enable switch."""
+"""Daily timer, details toggle, and manual pump switch."""
 from __future__ import annotations
 
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import STATE_ON
+from homeassistant.const import STATE_ON, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, STATE_IDLE
+from . import AutomatedGardenWateringConfigEntry
+from .const import STATE_IDLE
 from .coordinator import IrrigationCoordinator
 from .entity import IrrigationBaseEntity
 
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: AutomatedGardenWateringConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    coordinator: IrrigationCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     entities: list[SwitchEntity] = [
         DailyTimerSwitch(coordinator),
         DetailsSwitch(coordinator),
@@ -28,10 +32,11 @@ async def async_setup_entry(
 
 
 class DailyTimerSwitch(IrrigationBaseEntity, SwitchEntity):
-    _attr_icon = "mdi:timer-outline"
+    _attr_translation_key = "daily_timer"
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "daily_timer", "Daily timer")
+        super().__init__(coordinator, "daily_timer")
 
     @property
     def is_on(self) -> bool:
@@ -51,10 +56,11 @@ class DetailsSwitch(IrrigationBaseEntity, SwitchEntity):
     status/timer/multiplier list can be hidden behind the 'Details' button.
     """
 
-    _attr_icon = "mdi:information-outline"
+    _attr_translation_key = "show_details"
+    _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "details_visible", "Show details")
+        super().__init__(coordinator, "details_visible")
 
     @property
     def is_on(self) -> bool:
@@ -76,10 +82,17 @@ class ManualPumpSwitch(IrrigationBaseEntity, SwitchEntity):
     time to stop an active run.
     """
 
-    _attr_icon = "mdi:water-pump"
+    _attr_translation_key = "manual_pump"
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "manual_pump", "Pump (manual)")
+        super().__init__(coordinator, "manual_pump")
+
+    @property
+    def available(self) -> bool:
+        return (
+            self.coordinator.pump_switch is not None
+            and self.hass.states.get(self.coordinator.pump_switch) is not None
+        )
 
     @property
     def is_on(self) -> bool:

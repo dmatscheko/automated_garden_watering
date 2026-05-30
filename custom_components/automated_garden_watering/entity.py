@@ -13,10 +13,19 @@ class IrrigationBaseEntity(Entity):
     _attr_should_poll = False
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: IrrigationCoordinator, key: str, name: str) -> None:
+    def __init__(
+        self,
+        coordinator: IrrigationCoordinator,
+        key: str,
+        name: str | None = None,
+    ) -> None:
         self.coordinator = coordinator
         self._attr_unique_id = f"{coordinator.entry_id}_{key}"
-        self._attr_name = name
+        # Subclasses that set _attr_translation_key get their display name from
+        # translations/*.json; this fallback name is only used when neither
+        # translation_key nor a dynamic `name` property is set on the subclass.
+        if name is not None:
+            self._attr_name = name
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.entry_id)},
             name="Automated Garden Watering",

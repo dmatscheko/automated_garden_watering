@@ -5,11 +5,11 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.components.persistent_notification import (
     async_create as async_create_notification,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from . import AutomatedGardenWateringConfigEntry
 from .const import (
     BACKWASH_ACTIVE_STATES,
     DOMAIN,
@@ -19,11 +19,15 @@ from .coordinator import IrrigationCoordinator
 from .dashboard import build_dashboard
 from .entity import IrrigationBaseEntity
 
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: AutomatedGardenWateringConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    coordinator: IrrigationCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     entities: list[ButtonEntity] = [
         WaterAllButton(coordinator),
         BackwashButton(coordinator),
@@ -35,10 +39,10 @@ async def async_setup_entry(
 
 
 class WaterAllButton(IrrigationBaseEntity, ButtonEntity):
-    _attr_icon = "mdi:sprinkler-variant"
+    _attr_translation_key = "water_all"
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "water_all", "Water all")
+        super().__init__(coordinator, "water_all")
 
     async def async_press(self) -> None:
         await self.coordinator.async_water_all(from_timer=False)
@@ -53,10 +57,10 @@ class WaterAllButton(IrrigationBaseEntity, ButtonEntity):
 
 
 class BackwashButton(IrrigationBaseEntity, ButtonEntity):
-    _attr_icon = "mdi:backup-restore"
+    _attr_translation_key = "backwash"
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "backwash", "Backwash")
+        super().__init__(coordinator, "backwash")
 
     async def async_press(self) -> None:
         await self.coordinator.async_backwash_now()
@@ -80,14 +84,13 @@ class BackwashButton(IrrigationBaseEntity, ButtonEntity):
 class GenerateDashboardButton(IrrigationBaseEntity, ButtonEntity):
     """Generate a ready-to-paste Lovelace dashboard for this integration."""
 
-    _attr_icon = "mdi:view-dashboard-outline"
+    _attr_translation_key = "dashboard_yaml"
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        # Display name kept short ("Dashboard YAML") so it doesn't get
-        # truncated in HA's UI. The unique-id suffix stays `generate_dashboard`
-        # so existing entries in the entity registry survive the rename.
-        super().__init__(coordinator, "generate_dashboard", "Dashboard YAML")
+        # The unique-id suffix stays `generate_dashboard` so existing entries
+        # in the entity registry survive the rename to "Dashboard YAML".
+        super().__init__(coordinator, "generate_dashboard")
 
     async def async_press(self) -> None:
         yaml_text = build_dashboard(self.hass, self.coordinator)
@@ -105,15 +108,15 @@ class GenerateDashboardButton(IrrigationBaseEntity, ButtonEntity):
 
 
 class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
+    # User-supplied display name; rendered via the `name` property below.
+    # No translation_key, so HA uses the dynamic property directly.
     _attr_icon = "mdi:water"
 
     def __init__(self, coordinator: IrrigationCoordinator, zone_id: str) -> None:
         zone = coordinator.zones[zone_id]
-        # Friendly name = the user-supplied display name (updates dynamically
-        # via the `name` property below). HA generates the natural
-        # button.<device>_<name> id; __init__.py then renames it to
-        # button.<device>_zone_<order> so the buttons sort by run order.
-        # unique_id stays uuid-based so the entity survives renames/reorders.
+        # HA generates the natural button.<device>_<name> id; __init__.py then
+        # renames it to button.<device>_zone_<order> so the buttons sort by run
+        # order. unique_id stays uuid-based so the entity survives renames.
         super().__init__(coordinator, f"zone_{zone_id}", zone.name)
         self._zone_id = zone_id
 
@@ -121,6 +124,15 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
     def name(self) -> str:
         zone = self.coordinator.zones.get(self._zone_id)
         return zone.name if zone else self._attr_name
+
+    @property
+    def available(self) -> bool:
+        # If the underlying valve switch was deleted from HA, the zone button
+        # should mark itself unavailable so users see something is wrong.
+        zone = self.coordinator.zones.get(self._zone_id)
+        if not zone:
+            return False
+        return self.hass.states.get(zone.entity_id) is not None
 
     async def async_press(self) -> None:
         await self.coordinator.async_toggle_zone(self._zone_id)

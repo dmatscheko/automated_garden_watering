@@ -107,5 +107,78 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "idle": "Inaktiv",
+          "pump_pressure": "Pumpen-Druckaufbau",
+          "watering": "Bewässerung",
+          "backwash_pressure": "Rückspül-Druckaufbau",
+          "backwash": "Rückspülung (Rückfluss)",
+          "backwash_flush": "Rückspülung (Spülen)"
+        }
+      },
+      "active_zone": {"name": "Aktive Zone"},
+      "queue": {"name": "Warteschlange"},
+      "step_remaining": {"name": "Restzeit aktueller Schritt"},
+      "queue_remaining": {"name": "Restzeit Warteschlange"}
+    },
+    "button": {
+      "water_all": {"name": "Alles bewässern"},
+      "backwash": {"name": "Rückspülen"},
+      "dashboard_yaml": {"name": "Dashboard-YAML"}
+    },
+    "switch": {
+      "daily_timer": {"name": "Tages-Timer"},
+      "show_details": {"name": "Details anzeigen"},
+      "manual_pump": {"name": "Pumpe (manuell)"}
+    },
+    "number": {
+      "multiplier": {"name": "Bewässerungs-Multiplikator"}
+    },
+    "time": {
+      "daily_start": {"name": "Tägliche Startzeit"}
+    }
+  },
+  "services": {
+    "water_all": {
+      "name": "Alles bewässern",
+      "description": "Bewässert alle konfigurierten Zonen in ihrer Reihenfolge. Während eine Warteschlange aktiv ist, stoppt der Aufruf sie (Not-Aus)."
+    },
+    "stop": {
+      "name": "Stoppen",
+      "description": "Stoppt die aktuelle Warteschlange und schließt alle Ventile. Tut nichts, wenn nichts läuft."
+    },
+    "backwash": {
+      "name": "Rückspülen",
+      "description": "Startet sofort eine zweistufige Rückspülung (Rückfluss und anschließendes Spülen). Schlägt fehl, wenn kein Rückspülventil konfiguriert ist."
+    },
+    "water_zone": {
+      "name": "Zone bewässern",
+      "description": "Stellt eine einzelne Zone in die Warteschlange (oder entfernt sie) — per Anzeigename, Zonen-ID oder Ventil-Entitäts-ID.",
+      "fields": {
+        "zone": {
+          "name": "Zone",
+          "description": "Anzeigename (unabhängig von Groß-/Kleinschreibung), Zonen-ID oder Schalter-Entitäts-ID des Ventils."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Die Automatische Gartenbewässerung ist nicht eingerichtet. Bitte zuerst die Integration hinzufügen, bevor deren Aktionen aufgerufen werden."
+    },
+    "no_backwash_configured": {
+      "message": "Für die Automatische Gartenbewässerung ist kein Rückspülventil konfiguriert."
+    },
+    "zone_required": {
+      "message": "Es muss ein Zonenname, eine Zonen-ID oder eine Entitäts-ID angegeben werden."
+    },
+    "zone_not_found": {
+      "message": "Keine Zone passt zu „{zone}“. Bitte den Anzeigenamen, die Zonen-ID oder die Schalter-Entitäts-ID des Ventils angeben."
+    }
   }
 }

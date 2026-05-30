@@ -3,17 +3,26 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.config_entries import ConfigEntry
+import voluptuous as vol
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import slugify
 
-from .const import CONF_ZONE_ID, CONF_ZONE_ORDER, CONF_ZONES, DOMAIN
+from .const import CONF_ZONE_ID, CONF_ZONE_ORDER, CONF_ZONES, DOMAIN, STATE_IDLE
 from .coordinator import IrrigationCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+# ConfigEntry with our coordinator attached via runtime_data.
+type AutomatedGardenWateringConfigEntry = ConfigEntry[IrrigationCoordinator]
 
 PLATFORMS: list[Platform] = [
     Platform.BUTTON,
@@ -22,6 +31,15 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
     Platform.TIME,
 ]
+
+SERVICE_WATER_ALL = "water_all"
+SERVICE_STOP = "stop"
+SERVICE_BACKWASH = "backwash"
+SERVICE_WATER_ZONE = "water_zone"
+
+ATTR_ZONE = "zone"
+
+_WATER_ZONE_SCHEMA = vol.Schema({vol.Required(ATTR_ZONE): cv.string})
 
 
 def _merged(entry: ConfigEntry) -> dict:
@@ -35,10 +53,84 @@ def _zone_ids(data: dict) -> set[str]:
     return {z[CONF_ZONE_ID] for z in (data.get(CONF_ZONES) or []) if z.get(CONF_ZONE_ID)}
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+def _loaded_coordinator(hass: HomeAssistant) -> IrrigationCoordinator:
+    """Return the coordinator of the (single) loaded config entry.
+
+    Raises ServiceValidationError if no entry is loaded — surfaced to the user
+    via the HA UI when they call an action without the integration set up.
+    """
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.state is ConfigEntryState.LOADED:
+            return entry.runtime_data
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="not_loaded",
+    )
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register integration-level service actions (one-time)."""
+
+    async def _water_all(call: ServiceCall) -> None:
+        await _loaded_coordinator(hass).async_water_all(from_timer=False)
+
+    async def _stop(call: ServiceCall) -> None:
+        coord = _loaded_coordinator(hass)
+        # async_water_all doubles as emergency stop when something is running.
+        if coord.rt.queue or coord.rt.state != STATE_IDLE:
+            await coord.async_water_all(from_timer=False)
+
+    async def _backwash(call: ServiceCall) -> None:
+        coord = _loaded_coordinator(hass)
+        if not coord.backwash_switch:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="no_backwash_configured",
+            )
+        await coord.async_backwash_now()
+
+    async def _water_zone(call: ServiceCall) -> None:
+        coord = _loaded_coordinator(hass)
+        target = (call.data.get(ATTR_ZONE) or "").strip()
+        if not target:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="zone_required",
+            )
+        # Resolve by zone id, zone display name, or valve entity_id.
+        match_id: str | None = None
+        lowered = target.lower()
+        for zone in coord.zones.values():
+            if (
+                zone.id == target
+                or zone.entity_id == target
+                or zone.name.lower() == lowered
+            ):
+                match_id = zone.id
+                break
+        if not match_id:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="zone_not_found",
+                translation_placeholders={"zone": target},
+            )
+        await coord.async_toggle_zone(match_id)
+
+    hass.services.async_register(DOMAIN, SERVICE_WATER_ALL, _water_all)
+    hass.services.async_register(DOMAIN, SERVICE_STOP, _stop)
+    hass.services.async_register(DOMAIN, SERVICE_BACKWASH, _backwash)
+    hass.services.async_register(
+        DOMAIN, SERVICE_WATER_ZONE, _water_zone, schema=_WATER_ZONE_SCHEMA
+    )
+    return True
+
+
+async def async_setup_entry(
+    hass: HomeAssistant, entry: AutomatedGardenWateringConfigEntry
+) -> bool:
     coordinator = IrrigationCoordinator(hass, entry.entry_id, _merged(entry))
     await coordinator.async_start()
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Entities (and the device) now exist; give zone buttons their ordered ids.
@@ -48,9 +140,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _options_updated(
+    hass: HomeAssistant, entry: AutomatedGardenWateringConfigEntry
+) -> None:
     """Handle an options/data change on the config entry."""
-    coordinator: IrrigationCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     # Compare the set of zones BEFORE applying the new config. The coordinator
     # still holds the previously loaded zones at this point.
@@ -138,11 +232,10 @@ def _sync_zone_entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
             )
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant, entry: AutomatedGardenWateringConfigEntry
+) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    coordinator: IrrigationCoordinator | None = hass.data.get(DOMAIN, {}).pop(
-        entry.entry_id, None
-    )
-    if coordinator:
+    if unload_ok and (coordinator := getattr(entry, "runtime_data", None)):
         await coordinator.async_stop()
     return unload_ok

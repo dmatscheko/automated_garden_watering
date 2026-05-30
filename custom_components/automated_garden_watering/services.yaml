@@ -1,0 +1,16 @@
+water_all:
+  fields: {}
+
+stop:
+  fields: {}
+
+backwash:
+  fields: {}
+
+water_zone:
+  fields:
+    zone:
+      required: true
+      example: "Front lawn"
+      selector:
+        text:

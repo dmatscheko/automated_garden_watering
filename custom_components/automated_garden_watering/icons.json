@@ -1,0 +1,33 @@
+{
+  "entity": {
+    "sensor": {
+      "status": {"default": "mdi:state-machine"},
+      "active_zone": {"default": "mdi:water-pump"},
+      "queue": {"default": "mdi:format-list-numbered"},
+      "step_remaining": {"default": "mdi:timer-sand"},
+      "queue_remaining": {"default": "mdi:timer-outline"}
+    },
+    "button": {
+      "water_all": {"default": "mdi:sprinkler-variant"},
+      "backwash": {"default": "mdi:backup-restore"},
+      "dashboard_yaml": {"default": "mdi:view-dashboard-outline"}
+    },
+    "switch": {
+      "daily_timer": {"default": "mdi:timer-outline"},
+      "show_details": {"default": "mdi:information-outline"},
+      "manual_pump": {"default": "mdi:water-pump"}
+    },
+    "number": {
+      "multiplier": {"default": "mdi:multiplication"}
+    },
+    "time": {
+      "daily_start": {"default": "mdi:clock-time-four-outline"}
+    }
+  },
+  "services": {
+    "water_all": "mdi:sprinkler-variant",
+    "stop": "mdi:stop-circle-outline",
+    "backwash": "mdi:backup-restore",
+    "water_zone": "mdi:water"
+  }
+}

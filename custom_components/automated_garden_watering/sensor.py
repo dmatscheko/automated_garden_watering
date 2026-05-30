@@ -1,24 +1,42 @@
 """Status and queue sensors."""
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from . import AutomatedGardenWateringConfigEntry
 from .const import (
     BACKWASH_ACTIVE_STATES,
-    DOMAIN,
+    STATE_BACKWASH,
+    STATE_BACKWASH_FLUSH,
+    STATE_BACKWASH_PRESSURE,
     STATE_IDLE,
+    STATE_PUMP_PRESSURE,
+    STATE_WATERING,
 )
 from .coordinator import IrrigationCoordinator
 from .entity import IrrigationBaseEntity
 
+# Coordinator pushes via dispatcher; no parallel polling required.
+PARALLEL_UPDATES = 0
+
+STATUS_OPTIONS = [
+    STATE_IDLE,
+    STATE_PUMP_PRESSURE,
+    STATE_WATERING,
+    STATE_BACKWASH_PRESSURE,
+    STATE_BACKWASH,
+    STATE_BACKWASH_FLUSH,
+]
+
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: AutomatedGardenWateringConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    coordinator: IrrigationCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     async_add_entities(
         [
             StatusSensor(coordinator),
@@ -47,10 +65,12 @@ def _hms_attrs(seconds: int) -> dict:
 
 
 class StatusSensor(IrrigationBaseEntity, SensorEntity):
-    _attr_icon = "mdi:state-machine"
+    _attr_translation_key = "status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = STATUS_OPTIONS
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "status", "Status")
+        super().__init__(coordinator, "status")
 
     @property
     def native_value(self) -> str:
@@ -71,7 +91,6 @@ class StatusSensor(IrrigationBaseEntity, SensorEntity):
             if zid in self.coordinator.zones
         ]
         return {
-            "state": rt.state,
             "queue": queue_names,
             "queue_length": len(rt.queue),
             "active_zone": active.name if active else None,
@@ -81,10 +100,10 @@ class StatusSensor(IrrigationBaseEntity, SensorEntity):
 
 
 class ActiveZoneSensor(IrrigationBaseEntity, SensorEntity):
-    _attr_icon = "mdi:water-pump"
+    _attr_translation_key = "active_zone"
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "active_zone", "Active zone")
+        super().__init__(coordinator, "active_zone")
 
     @property
     def native_value(self) -> str:
@@ -93,15 +112,12 @@ class ActiveZoneSensor(IrrigationBaseEntity, SensorEntity):
             return self.coordinator.zones[active_id].name
         return "none"
 
-    # No per-second attributes: state is the zone name, which only changes when
-    # the active zone changes. Remaining time is on the step-remaining sensor.
-
 
 class QueueSensor(IrrigationBaseEntity, SensorEntity):
-    _attr_icon = "mdi:format-list-numbered"
+    _attr_translation_key = "queue"
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "queue", "Queue")
+        super().__init__(coordinator, "queue")
 
     @property
     def native_value(self) -> str:
@@ -128,10 +144,10 @@ class QueueSensor(IrrigationBaseEntity, SensorEntity):
 class CurrentStepRemainingSensor(IrrigationBaseEntity, SensorEntity):
     """Time left in the active zone, or in the backwash while it runs."""
 
-    _attr_icon = "mdi:timer-sand"
+    _attr_translation_key = "step_remaining"
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "step_remaining", "Current step time remaining")
+        super().__init__(coordinator, "step_remaining")
 
     @property
     def native_value(self) -> str:
@@ -153,10 +169,10 @@ class CurrentStepRemainingSensor(IrrigationBaseEntity, SensorEntity):
 class QueueRemainingSensor(IrrigationBaseEntity, SensorEntity):
     """Total watering time left for the whole queue (pauses during backwash)."""
 
-    _attr_icon = "mdi:timer-outline"
+    _attr_translation_key = "queue_remaining"
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "queue_remaining", "Queue time remaining")
+        super().__init__(coordinator, "queue_remaining")
 
     @property
     def native_value(self) -> str:

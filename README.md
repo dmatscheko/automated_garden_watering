@@ -116,6 +116,114 @@ prefix to your device name).
 > "pump on before a valve opens", and it only applies to the backwash valve,
 > never to zone valves.
 
+## Actions (service calls)
+
+The integration registers four service actions. Calling them from automations
+is equivalent to pressing the matching button (with looser ergonomics, e.g.
+by zone name instead of entity_id).
+
+| Service | Fields | Behavior |
+|---|---|---|
+| `automated_garden_watering.water_all` | — | Queue every zone in run order. Calling it again while a queue is active stops the queue (emergency stop). |
+| `automated_garden_watering.stop` | — | Stop the queue and close all valves. No-op when idle. |
+| `automated_garden_watering.backwash` | — | Trigger an immediate two-stage backwash. Raises an error if no backwash valve is configured. |
+| `automated_garden_watering.water_zone` | `zone` (required) | Queue or dequeue one zone by display name (case-insensitive), zone id, or its valve `switch.*` entity_id. |
+
+Errors are surfaced as `ServiceValidationError` with translated messages: e.g.
+unknown zone, no backwash valve configured, or the integration not yet set up.
+
+## Use cases
+
+- **Stagger morning watering** — pair the daily timer with the watering
+  multiplier to vary total run time by season: a higher number entity value
+  during summer, a lower one in shoulder seasons. Multiplier and timer have
+  their own entities, so an automation can write to them directly.
+- **Rain skip** — feed a rain sensor into an automation that flips
+  `switch.<…>_daily_timer` off for the day (and back on the next morning).
+- **Hose-only operation** — if you have no zone valves but want pump
+  coordination, leave zones empty and just use the manual pump switch.
+- **Filter-friendly long runs** — for orchards or long rows, set
+  `backwash_interval` to a few minutes so the filter is cleaned mid-cycle
+  rather than only at the end.
+
+## Example automations
+
+```yaml
+# Skip today's daily run if it rained overnight.
+automation:
+  - alias: "Garden — skip daily watering after rain"
+    triggers:
+      - trigger: time
+        at: "05:55:00"
+    conditions:
+      - condition: numeric_state
+        entity_id: sensor.rain_last_24h_mm
+        above: 2
+    actions:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.automated_garden_watering_daily_timer
+```
+
+```yaml
+# Water a single zone by display name on demand.
+script:
+  water_front_lawn:
+    sequence:
+      - action: automated_garden_watering.water_zone
+        data:
+          zone: "Front lawn"
+```
+
+## Data updates
+
+The integration is fully event-driven — no polling. The coordinator runs an
+internal 1-second tick that advances the state machine and pushes updates to
+entities via the HA dispatcher. The recorder-heavy countdown sensors should be
+excluded from history as described in *Database / recorder* above.
+
+## Known limitations
+
+- Only one config entry (one controller device) per Home Assistant instance.
+  This is intentional: the daily timer, manual pump rules, and "Water all" all
+  assume a single shared pump/backwash circuit.
+- The state machine ticks once per second; phase durations are integer seconds.
+  Sub-second timing is not supported.
+- If a configured switch entity is renamed or removed, the corresponding zone
+  button becomes unavailable; reopen the integration's *Configure* dialog to
+  pick a new switch.
+- The dashboard YAML generator targets the current set of entities and devices
+  at the time you press the button — paste it again after adding or removing
+  zones.
+
+## Troubleshooting
+
+- **A zone doesn't run.** Open Developer Tools → States and verify the zone's
+  `switch.*` entity exists and toggles when called manually. If it doesn't, the
+  zone button will show as unavailable.
+- **Pump won't turn off.** Manual pump-off is intentionally refused while a
+  queue or backwash is running. Press *Water all* (or call
+  `automated_garden_watering.stop`) to abort, then the pump can be turned off.
+- **Daily timer fired at the wrong time.** Home Assistant's timezone setting
+  controls when the `time` entity fires; check *Settings → System → General*.
+- **Backwash button missing.** It only appears when a backwash valve was
+  selected during setup. Add one via *Configure → Global settings*.
+- **Need more detail for a bug report?** Open the integration in
+  *Settings → Devices & Services*, click the three-dot menu, and choose
+  *Download diagnostics* — the dump includes the coordinator state, queue,
+  and (redacted) configured switch entities.
+
+## Removal
+
+1. *Settings → Devices & Services → Automated Garden Watering → three-dot menu → Delete*.
+   This removes all of the integration's entities, the device, and its stored state.
+2. If you installed via HACS and want to uninstall the integration itself, go
+   to *HACS → Integrations → Automated Garden Watering → ⋮ → Remove*, then
+   restart Home Assistant.
+3. The underlying `switch.*` entities you selected as pump / backwash / zone
+   valves are *not* removed — they belong to your hardware integration and
+   stay as-is.
+
 ## License
 
 Apache License, Version 2.0 — see [LICENSE](LICENSE).
