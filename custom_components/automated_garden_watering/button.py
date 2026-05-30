@@ -84,31 +84,16 @@ class GenerateDashboardButton(IrrigationBaseEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator: IrrigationCoordinator) -> None:
-        super().__init__(coordinator, "generate_dashboard", "Generate dashboard YAML")
+        # Display name kept short ("Dashboard YAML") so it doesn't get
+        # truncated in HA's UI. The unique-id suffix stays `generate_dashboard`
+        # so existing entries in the entity registry survive the rename.
+        super().__init__(coordinator, "generate_dashboard", "Dashboard YAML")
 
     async def async_press(self) -> None:
         yaml_text = build_dashboard(self.hass, self.coordinator)
-
-        # Best-effort: also drop a file next to configuration.yaml.
-        path = self.hass.config.path("automated_garden_watering_dashboard.yaml")
-
-        def _write() -> None:
-            with open(path, "w", encoding="utf-8") as fh:
-                fh.write(yaml_text)
-
-        wrote = True
-        try:
-            await self.hass.async_add_executor_job(_write)
-        except Exception:  # noqa: BLE001
-            wrote = False
-
-        file_line = (
-            f"Also saved to `{path}`.\n\n" if wrote else ""
-        )
         message = (
-            "Copy the YAML below into your dashboard's **Raw configuration editor** "
-            "(under the existing `views:` key).\n\n"
-            f"{file_line}"
+            "Copy the YAML below into your dashboard's **Raw configuration "
+            "editor** (under the existing `views:` key).\n\n"
             f"```yaml\n{yaml_text}\n```"
         )
         async_create_notification(
