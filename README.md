@@ -109,4 +109,4 @@ prefix to your device name).
 
 ## License
 
-MIT
+Apache License, Version 2.0 — see [LICENSE](LICENSE).
