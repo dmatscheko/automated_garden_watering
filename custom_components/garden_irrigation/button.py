@@ -153,15 +153,18 @@ class ExportConfigButton(IrrigationBaseEntity, ButtonEntity):
 
     def _build_payload(self, entry: ConfigEntry) -> dict:
         c = self.coordinator
+        # Flatten HA's entry.data (initial setup snapshot) and entry.options
+        # (every later change) into the single "config" dict the coordinator
+        # actually uses — options overrides data, just like _merged() does at
+        # load time. This avoids confusing duplicate / stale-looking blocks in
+        # the export and gives the importer one unambiguous source of truth.
+        config = dict(entry.data)
+        config.update(entry.options or {})
         return {
             "schema_version": EXPORT_SCHEMA_VERSION,
             "source_domain": DOMAIN,
             "exported_at": dt_util.now().isoformat(),
-            # Whole-dict round-trip: any future config key works without code
-            # changes here, because the new integration just feeds these back
-            # into a new config entry.
-            "data": dict(entry.data),
-            "options": dict(entry.options or {}),
+            "config": config,
             "state": {
                 "last_run": {
                     zid: dt.isoformat() for zid, dt in c.last_run.items()
@@ -201,7 +204,7 @@ class ExportConfigButton(IrrigationBaseEntity, ButtonEntity):
             return
 
         de = (self.hass.config.language or "en").lower().startswith("de")
-        n_zones = len(payload["data"].get("zones") or payload["options"].get("zones") or [])
+        n_zones = len(payload["config"].get("zones") or [])
         if de:
             title = "Gartenbewässerung – Sicherung erstellt"
             message = (
