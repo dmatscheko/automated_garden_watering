@@ -2,6 +2,8 @@
 
 A Home Assistant integration for garden irrigation with a queue-based watering controller, well pump and backwash valve coordination, automatic mid-cycle and end-of-cycle backwash, a daily timer, and a global watering multiplier.
 
+What sets it apart from other irrigation integrations: a **two-stage, interval-driven backwash** — a pump-off reverse-flow pass followed by a pump-on flush — that triggers automatically every N minutes of cumulative watering during long runs (and at end-of-queue when warranted). The reverse-flow stage lets stored pressure push water backwards through the filter to dislodge dirt, then the flush stage carries it away. The result is a filter that stays a lot cleaner than a single open-valve pulse.
+
 ## Features
 
 - Works on top of any existing Home Assistant `switch` entities (pump, backwash valve, zone valves).
