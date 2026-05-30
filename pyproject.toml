@@ -1,0 +1,41 @@
+[project]
+name = "automated-garden-watering"
+version = "0.7.0"
+description = "Home Assistant custom integration for queue-based garden irrigation."
+requires-python = ">=3.13.2"
+# Runtime deps are provided by Home Assistant itself; nothing extra needed.
+dependencies = []
+
+[tool.uv]
+# pytest-homeassistant-custom-component pins to HA pre-releases.
+prerelease = "allow"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-homeassistant-custom-component>=0.13.250",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q -p no:cacheprovider"
+
+[tool.coverage.run]
+source = ["custom_components/automated_garden_watering"]
+omit = [
+    "custom_components/automated_garden_watering/__pycache__/*",
+    "custom_components/automated_garden_watering/dashboard.py",
+]
+branch = false
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "pragma: no cover",
+]

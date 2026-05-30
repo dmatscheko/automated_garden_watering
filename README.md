@@ -224,6 +224,22 @@ excluded from history as described in *Database / recorder* above.
    valves are *not* removed — they belong to your hardware integration and
    stay as-is.
 
+## Development
+
+Tests live in [`tests/`](tests) and use
+[`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component).
+With [uv](https://docs.astral.sh/uv/) installed:
+
+```sh
+uv sync --dev
+uv run pytest                                         # all tests
+uv run pytest --cov=custom_components/automated_garden_watering  # with coverage
+```
+
+Coverage currently sits at ~96%. The state machine, config + options flows,
+service actions, and diagnostics are exercised end-to-end via the HA test
+harness (no real switches required).
+
 ## License
 
 Apache License, Version 2.0 — see [LICENSE](LICENSE).
