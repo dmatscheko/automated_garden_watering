@@ -1,0 +1,112 @@
+rules:
+  # ---------- Bronze ----------
+  action-setup: done
+  appropriate-polling:
+    status: exempt
+    comment: |
+      The integration is event-driven. A 1-second internal tick advances the
+      state machine and pushes updates via the HA dispatcher; no remote/device
+      polling is involved.
+  brands: done
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency: done
+  docs-actions: done
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure:
+    status: exempt
+    comment: |
+      The config flow's entity selectors only accept existing `switch.*`
+      entities, so a non-existent target cannot reach setup. There is no
+      external service or device to connectivity-test.
+  test-before-setup:
+    status: exempt
+    comment: |
+      There is no external service to probe. If a previously-configured switch
+      entity disappears, dependent entities mark themselves unavailable and a
+      repair issue is raised (see `repair-issues`) — failing setup would block
+      the user from fixing the configuration in the UI.
+  unique-config-entry: done
+
+  # ---------- Silver ----------
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: exempt
+    comment: |
+      No network/device connection is held open. A missing configured switch
+      entity is surfaced via a repair issue (not log spam) and dependent
+      entities go unavailable automatically.
+  parallel-updates: done
+  reauthentication-flow:
+    status: exempt
+    comment: No authentication — wraps user-chosen local HA switch entities.
+  test-coverage: done
+
+  # ---------- Gold ----------
+  devices: done
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: |
+      Nothing to discover. The integration coordinates user-selected
+      `switch.*` entities; there is no hardware on a network that this
+      integration owns.
+  discovery-update-info:
+    status: exempt
+    comment: See `discovery` — no discovery flow applies.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices:
+    status: exempt
+    comment: |
+      Works on any HA `switch.*` entity (smart plug, relay board, water-valve
+      integration, etc.). No specific device model is supported or excluded.
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: |
+      A single virtual device represents the controller; there are no
+      discoverable devices that can come and go at runtime.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: exempt
+    comment: |
+      All entities are meaningful for the dashboard's default view; nothing
+      is so verbose or rarely-used that it should ship disabled. The two
+      per-second countdown sensors are excluded from the recorder via
+      documented `recorder:` config instead.
+  entity-translations: done
+  exception-translations: done
+  icon-translations: done
+  reconfiguration-flow: done
+  repair-issues: done
+  stale-devices:
+    status: exempt
+    comment: |
+      Only one virtual device exists per config entry; there is no fleet of
+      discoverable devices that could become stale.
+
+  # ---------- Platinum ----------
+  async-dependency:
+    status: exempt
+    comment: No external runtime dependencies — manifest.json `requirements` is empty.
+  inject-websession:
+    status: exempt
+    comment: No HTTP/network I/O — nothing that takes a websession.
+  strict-typing: done

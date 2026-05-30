@@ -245,6 +245,23 @@ state machine, config + options flows, reconfiguration flow, service actions,
 repair issues, and diagnostics are all exercised end-to-end via the HA test
 harness (no real switches required).
 
+### Integration quality scale
+
+Per-rule status is declared in
+[`quality_scale.yaml`](custom_components/automated_garden_watering/quality_scale.yaml)
+following the
+[Home Assistant integration quality scale](https://developers.home-assistant.io/docs/core/integration-quality-scale/).
+All 52 rules (Bronze → Platinum) are either `done` or `exempt` — exemptions are
+the ones that don't apply to an integration that orchestrates user-selected
+local switches (no discovery, no auth, no external network deps).
+
+`manifest.json` declares `"quality_scale": "custom"` — that is HA's reserved
+value for custom integrations distributed via HACS. The Bronze→Platinum tier
+names are graded by the HA core team during upstreaming review, so they only
+apply once an integration lives under `homeassistant/components/`. The
+`quality_scale.yaml` checklist still tracks per-rule compliance so the
+integration is ready for upstreaming if/when that ever happens.
+
 ## License
 
 Apache License, Version 2.0 — see [LICENSE](LICENSE).
