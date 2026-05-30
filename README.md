@@ -22,25 +22,6 @@ A Home Assistant integration for garden irrigation with a queue-based watering c
 3. Restart Home Assistant.
 4. *Settings → Devices & Services → Add Integration → Automated Garden Watering*.
 
-## Migrating from the v0.x "Garden Irrigation" integration
-
-This integration was renamed from `garden_irrigation` to `automated_garden_watering`
-in v0.5.0. To bring your existing setup over without losing zones or last-run
-history:
-
-1. **In the old version (v0.4.1):** press *Export configuration* on the
-   integration's device page. A backup file appears at
-   `<config>/garden_irrigation_export.json`.
-2. **Update via HACS** to the new version, then **restart Home Assistant**.
-3. The old integration entry will be orphaned ("not loaded") because its domain
-   no longer exists. Remove it from *Settings → Devices & Services*. (Your
-   backup file is untouched.)
-4. *Add Integration → Automated Garden Watering* → choose **Import from a backup
-   file**. The default path is pre-filled with whichever backup file exists.
-   Confirm — your zones, settings and last-run history are restored.
-5. Press *Generate dashboard YAML* to get a fresh dashboard with the new entity
-   IDs.
-
 ## Configuration
 
 The setup flow asks for the pump and backwash switch (both optional), and at least one zone. After setup, use *Configure* on the integration card to:
@@ -78,7 +59,6 @@ cleans the filter far better than just opening the valve:
 | `button.automated_garden_watering_zone_<order>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<order>` suffix is the zone's run order, so the buttons sort naturally in the UI. The friendly zone name set during setup is the entity's display name and is also in the `zone_name` attribute. Attributes `last_run` (ISO) and `last_run_friendly` (e.g. `Today 14:30`, `Yesterday 09:00`, `Mon 09:00`, `May 03`) record when the zone last watered (persisted across restarts). |
 | `switch.automated_garden_watering_pump_manual` | Manual well-pump control for e.g. a garden hose (only created if a pump is configured). Turning it **off** is blocked while a queue/backwash is active so the pump-first safety rule can't be broken manually. Attributes `status`, `last_run`, `last_run_friendly`, `controlled_by` (`manual`/`automation`) — so it can be shown as a button with a last-run line like the zones. |
 | `button.automated_garden_watering_generate_dashboard_yaml` | Config button: generates a complete dashboard YAML for your exact entities/zones and shows it in a notification (also writes `automated_garden_watering_dashboard.yaml` to your config folder). |
-| `button.automated_garden_watering_export_configuration` | Config button: writes `<config>/automated_garden_watering_export.json` with **all** configuration (pump/backwash, zones, timings, multiplier, daily timer) **plus** the last-run history. Use this to back up the integration or to migrate to a renamed/reinstalled version. |
 | `number.automated_garden_watering_watering_multiplier` | Global watering multiplier. |
 | `time.automated_garden_watering_daily_start_time` | Daily start time. |
 | `switch.automated_garden_watering_daily_timer` | Enable/disable the daily timer. |

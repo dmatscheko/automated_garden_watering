@@ -2,14 +2,6 @@
   "config": {
     "step": {
       "user": {
-        "title": "Automated Garden Watering",
-        "description": "How would you like to set up this integration?",
-        "menu_options": {
-          "new_setup": "New setup",
-          "restore": "Import from a backup file"
-        }
-      },
-      "new_setup": {
         "title": "Automated Garden Watering — global settings",
         "description": "Set up your pump, backwash valve, and timing defaults. Both switches are optional — leave empty if you don't have that hardware.",
         "data": {
@@ -53,25 +45,7 @@
         "title": "Add another zone?",
         "description": "{count} zone(s) configured so far.",
         "data": {"add_another": "Add another zone"}
-      },
-      "restore": {
-        "title": "Import from backup",
-        "description": "Path to the export file produced by the *Export configuration* button. Files from the previous *Garden Irrigation* integration work too.\n\nDetected default: `{default_path}`.",
-        "data": {"path": "Backup file path"},
-        "data_description": {
-          "path": "Absolute path or a path relative to your Home Assistant config folder."
-        }
-      },
-      "restore_confirm": {
-        "title": "Confirm import",
-        "description": "About to import this backup:\n\n- **File:** `{source_path}`\n- **Source integration:** `{source_domain}`\n- **Exported:** {exported_at}\n- **Zones ({zone_count}):**\n{zones}\n- **Last-run history entries:** {last_run_count}\n\nLeave *Confirm import* ticked and press Submit to create the integration with these settings.",
-        "data": {"confirm": "Confirm import"}
       }
-    },
-    "error": {
-      "file_not_found": "No file found at that path.",
-      "invalid_format": "The file is not a valid export — couldn't read it as JSON.",
-      "unsupported_version": "This export file uses a schema version this integration doesn't understand."
     },
     "abort": {
       "already_configured": "Automated Garden Watering is already configured. Use 'Configure' on the existing entry to change settings."
