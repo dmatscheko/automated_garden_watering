@@ -24,15 +24,18 @@ CONF_BACKWASH_THRESHOLD = "backwash_threshold"  # seconds of cumulative watering
 CONF_DAILY_START = "daily_start"               # "HH:MM:SS"
 CONF_DAILY_TIMER_ENABLED = "daily_timer_enabled"
 
-# Defaults
+# Defaults — values informed by real-world testing, except the per-zone
+# duration which is intentionally short (5 min) so a first-time user with just
+# a hose attached (no sprinkler) can try the integration without flooding the
+# garden by accident.
 DEFAULT_MULTIPLIER = 1.0
-DEFAULT_PUMP_DELAY = 15
+DEFAULT_PUMP_DELAY = 10
 DEFAULT_BACKWASH_DELAY = 10
 DEFAULT_BACKWASH_RUNTIME = 15
 DEFAULT_BACKWASH_FLUSH_RUNTIME = 10
-DEFAULT_BACKWASH_INTERVAL = 15 * 60
+DEFAULT_BACKWASH_INTERVAL = 10 * 60
 DEFAULT_BACKWASH_THRESHOLD = 3 * 60
-DEFAULT_ZONE_DURATION = 10 * 60
+DEFAULT_ZONE_DURATION = 5 * 60
 DEFAULT_DAILY_START = "06:00:00"
 DEFAULT_DAILY_TIMER_ENABLED = False
 
