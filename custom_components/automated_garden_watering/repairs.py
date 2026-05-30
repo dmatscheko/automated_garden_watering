@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
@@ -44,10 +45,16 @@ def async_sync_issues(
     for zone in coordinator.zones.values():
         expected[_issue_id("zone", zone.id)] = (zone.entity_id, f"zone '{zone.name}'")
 
-    # Raise an issue per missing entity.
+    # Raise an issue per missing entity. We check the entity *registry* rather
+    # than `hass.states` because dependent integrations (ESPHome, MQTT, etc.)
+    # may not have set up their entities yet by the time we run on startup —
+    # checking states there would fire false-positive repairs that vanish
+    # seconds later. A registry entry, on the other hand, means the user truly
+    # has that entity configured even if its state isn't loaded yet.
+    entity_reg = er.async_get(hass)
     raised: set[str] = set()
     for issue_id, (entity_id, name) in expected.items():
-        if hass.states.get(entity_id) is None:
+        if entity_reg.async_get(entity_id) is None and hass.states.get(entity_id) is None:
             ir.async_create_issue(
                 hass,
                 DOMAIN,
