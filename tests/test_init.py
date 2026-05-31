@@ -14,6 +14,7 @@ from .conftest import (
     BACKWASH_ENTITY,
     PUMP_ENTITY,
     ZONE1_ENTITY,
+    ZONE2_ENTITY,
     advance,
     make_config,
     register_switch_mocks,
@@ -164,8 +165,9 @@ async def test_zone_button_unavailable_when_switch_missing(
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    # Find the zone button entity_id (order-renamed to *_zone_1).
-    states = [s for s in hass.states.async_all("button") if "zone_1" in s.entity_id]
+    # Find the zone button entity_id — slugified from the display name "Zone 1"
+    # gives the suffix `_zone_1`.
+    states = [s for s in hass.states.async_all("button") if s.entity_id.endswith("_zone_1")]
     assert states, "zone_1 button should exist"
     assert states[0].state == "unavailable"
 
@@ -194,3 +196,87 @@ async def test_options_updated_inplace_keeps_state(
     await hass.async_block_till_done()
     assert entry.runtime_data is coord_before
     assert entry.runtime_data.pump_delay == 99
+
+
+async def test_zone_entity_ids_use_name_slug(
+    hass: HomeAssistant, underlying_switch_states: None
+) -> None:
+    """Zone button entity_ids are derived from the slugified display name."""
+    from custom_components.automated_garden_watering.const import (
+        CONF_ZONE_DURATION,
+        CONF_ZONE_ENTITY,
+        CONF_ZONE_ID,
+        CONF_ZONE_NAME,
+        CONF_ZONE_ORDER,
+        CONF_ZONES,
+    )
+
+    data = make_config()
+    # Rename the two zones to descriptive labels.
+    data[CONF_ZONES] = [
+        {
+            CONF_ZONE_ID: "z1",
+            CONF_ZONE_ENTITY: ZONE1_ENTITY,
+            CONF_ZONE_NAME: "Fensterblumen",
+            CONF_ZONE_DURATION: 5,
+            CONF_ZONE_ORDER: 1,
+        },
+        {
+            CONF_ZONE_ID: "z2",
+            CONF_ZONE_ENTITY: ZONE2_ENTITY,
+            CONF_ZONE_NAME: "Hochbeet",
+            CONF_ZONE_DURATION: 5,
+            CONF_ZONE_ORDER: 2,
+        },
+    ]
+    entry = MockConfigEntry(domain=DOMAIN, data=data, unique_id=DOMAIN, title="x")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    eids = {s.entity_id for s in hass.states.async_all("button")}
+    assert any(e.endswith("_zone_fensterblumen") for e in eids), eids
+    assert any(e.endswith("_zone_hochbeet") for e in eids), eids
+    # No leftover order-suffixed entity_ids.
+    assert not any(e.endswith("_zone_1") or e.endswith("_zone_2") for e in eids), eids
+
+
+async def test_zone_entity_id_collision_breaks_by_order(
+    hass: HomeAssistant, underlying_switch_states: None
+) -> None:
+    """Two zones with identically-slugged names get '_2' on the higher-order one."""
+    from custom_components.automated_garden_watering.const import (
+        CONF_ZONE_DURATION,
+        CONF_ZONE_ENTITY,
+        CONF_ZONE_ID,
+        CONF_ZONE_NAME,
+        CONF_ZONE_ORDER,
+        CONF_ZONES,
+    )
+
+    data = make_config()
+    data[CONF_ZONES] = [
+        {
+            CONF_ZONE_ID: "z1",
+            CONF_ZONE_ENTITY: ZONE1_ENTITY,
+            CONF_ZONE_NAME: "Beet",
+            CONF_ZONE_DURATION: 5,
+            CONF_ZONE_ORDER: 1,
+        },
+        {
+            CONF_ZONE_ID: "z2",
+            CONF_ZONE_ENTITY: ZONE2_ENTITY,
+            CONF_ZONE_NAME: "Beet",
+            CONF_ZONE_DURATION: 5,
+            CONF_ZONE_ORDER: 2,
+        },
+    ]
+    entry = MockConfigEntry(domain=DOMAIN, data=data, unique_id=DOMAIN, title="x")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    eids = {s.entity_id for s in hass.states.async_all("button")}
+    # Lower-order zone wins the bare slug; the higher-order one gets _2.
+    assert any(e.endswith("_zone_beet") and not e.endswith("_zone_beet_2") for e in eids), eids
+    assert any(e.endswith("_zone_beet_2") for e in eids), eids

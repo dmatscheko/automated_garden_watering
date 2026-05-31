@@ -6,7 +6,9 @@
 #
 # Paste under "views:" in your dashboard YAML, or use as a starting point in the
 # UI editor. Replace the example zone unique IDs with the ones you actually have
-# in `button.automated_garden_watering_zone_*`.
+# in `button.automated_garden_watering_zone_*` — the suffix is the slugified
+# zone display name (e.g. `Fensterblumen` → `…_zone_fensterblumen`), so the
+# entity_id stays stable when you reorder zones.
 #
 # The cards below color buttons by status using the `extra_state_attributes`
 # exposed by each zone button (`status` = idle | queued | running), the backwash

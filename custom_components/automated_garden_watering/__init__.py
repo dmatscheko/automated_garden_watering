@@ -15,7 +15,14 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import slugify
 
-from .const import CONF_ZONE_ID, CONF_ZONE_ORDER, CONF_ZONES, DOMAIN, STATE_IDLE
+from .const import (
+    CONF_ZONE_ID,
+    CONF_ZONE_NAME,
+    CONF_ZONE_ORDER,
+    CONF_ZONES,
+    DOMAIN,
+    STATE_IDLE,
+)
 from .coordinator import IrrigationCoordinator
 from .repairs import async_sync_issues
 
@@ -185,28 +192,47 @@ def _device_slug(hass: HomeAssistant, entry: ConfigEntry) -> str:
 
 
 def _sync_zone_entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Keep zone button entity_ids as button.<device>_zone_<order>.
+    """Keep zone button entity_ids as button.<device>_zone_<name-slug>.
 
-    Walks the entity registry, finds each zone button (by its stable unique_id)
-    and renames its entity_id to match its current run order, preserving the
-    device-name prefix. unique_id never changes, so the rename is
-    non-destructive: HA offers to migrate references in automations/dashboards.
+    The entity_id mirrors the zone's display name (slugified). This means:
+    - dashboards and automations referencing zones by entity_id stay readable
+      ('…_zone_fensterblumen' beats '…_zone_4');
+    - reordering zones does NOT change entity_ids, so dashboard buttons keep
+      pointing at the same zone after the user changes run-order numbers.
+
+    Collisions (two zones whose names slugify identically) are broken by
+    appending '_2', '_3', … in run-order order — the zone with the lower
+    `order` keeps the bare slug. unique_id never changes, so any rename is
+    non-destructive: HA offers to migrate references in automations and
+    dashboards automatically.
     """
     registry = er.async_get(hass)
     prefix = _device_slug(hass, entry)
     zones = _merged(entry).get(CONF_ZONES) or []
 
+    # Resolve each zone -> desired entity_id in a deterministic order so
+    # collision-breaking is stable across runs.
+    sorted_zones = sorted(
+        (z for z in zones if z.get(CONF_ZONE_ID)),
+        key=lambda z: (int(z.get(CONF_ZONE_ORDER) or 0), z.get(CONF_ZONE_NAME) or ""),
+    )
+    taken: set[str] = set()
     desired: dict[str, str] = {}
-    for z in zones:
-        zid = z.get(CONF_ZONE_ID)
-        order = z.get(CONF_ZONE_ORDER)
-        if not zid or order is None:
-            continue
+    for z in sorted_zones:
+        zid = z[CONF_ZONE_ID]
+        name = (z.get(CONF_ZONE_NAME) or "").strip()
+        slug = slugify(name) or "zone"
+        candidate = f"button.{prefix}_zone_{slug}"
+        n = 2
+        while candidate in taken:
+            candidate = f"button.{prefix}_zone_{slug}_{n}"
+            n += 1
+        taken.add(candidate)
         ent = registry.async_get_entity_id(
             "button", DOMAIN, f"{entry.entry_id}_zone_{zid}"
         )
         if ent:
-            desired[ent] = f"button.{prefix}_zone_{int(order)}"
+            desired[ent] = candidate
 
     # Pass 1: move entities whose current id is some other entity's target out
     # of the way, so swapping two zones' orders doesn't collide mid-rename.
