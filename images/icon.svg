@@ -1,74 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Automated Garden Watering — integration icon.
+  Flat, Home Assistant brand style: single HA-blue (#18BCF2) glyph on a
+  transparent background (see https://github.com/home-assistant/brands).
+  A water drop (watering) holding a white sprout (garden).
+-->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <defs>
-    <linearGradient id="dropGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#5BC0F8"/>
-      <stop offset="100%" stop-color="#1976D2"/>
-    </linearGradient>
-    <linearGradient id="leafGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#7CC576"/>
-      <stop offset="100%" stop-color="#2E8B3D"/>
-    </linearGradient>
-    <radialGradient id="bg" cx="0.5" cy="0.4" r="0.7">
-      <stop offset="0%" stop-color="#FFFFFF"/>
-      <stop offset="100%" stop-color="#E8F4FB"/>
-    </radialGradient>
-  </defs>
+  <!-- Water drop -->
+  <path d="M128 16
+           C 128 16, 36 108, 36 158
+           a 92 92 0 0 0 184 0
+           C 220 108, 128 16, 128 16 Z"
+        fill="#18BCF2"/>
 
-  <!-- Rounded background tile -->
-  <rect x="8" y="8" width="240" height="240" rx="48" ry="48" fill="url(#bg)" stroke="#CDE3EE" stroke-width="2"/>
+  <!-- Sprout: stem -->
+  <path d="M128 214 L 128 164"
+        stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" fill="none"/>
 
-  <!-- Water droplet -->
-  <path d="M128 36
-           C 128 36, 78 100, 78 148
-           a 50 50 0 1 0 100 0
-           C 178 100, 128 36, 128 36 Z"
-        fill="url(#dropGrad)"/>
+  <!-- Sprout: right leaf -->
+  <path d="M128 166
+           C 128 138, 150 120, 182 120
+           C 182 150, 158 166, 128 166 Z"
+        fill="#FFFFFF"/>
 
-  <!-- Droplet highlight -->
-  <path d="M108 110
-           C 100 124, 96 138, 99 152"
-        stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="7"
-        stroke-linecap="round" fill="none"/>
-
-  <!-- Leaf inside droplet -->
-  <path d="M128 116
-           C 152 116, 168 132, 168 156
-           C 144 156, 128 140, 128 116 Z"
-        fill="url(#leafGrad)"/>
-  <path d="M128 116
-           C 109 130, 102 146, 104 164"
-        stroke="#1E5E2A" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6"/>
-
-  <!-- Soil / ground line -->
-  <path d="M40 210
-           C 80 222, 176 222, 216 210"
-        stroke="#8D6E4B" stroke-width="20" stroke-linecap="round" fill="none"/>
-
-  <!-- Small sprouts -->
-  <path d="m 102.58182,215.56364 c 0,-12 8,-16 14,-16 0,8 -6,16 -14,16 z" fill="#4CAF50"/>
-  <path d="m 208.10909,206.83636 c 0,-12 -8,-16 -14,-16 0,8 6,16 14,16 z" fill="#4CAF50"/>
-
-  <!-- Grass tuft (left of center) -->
-  <path d="m 84.909091,213.52727 q -2,-12 -4,-20" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="m 91.781818,216.72727 q 0,-12 0,-22" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="m 146.36364,216.43637 q 2,-12 4,-18" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" fill="none"/>
-
-  <!-- Tulip -->
-  <path d="m 45.963636,202.47273 q -1,-16 0,-32" stroke="#2E8B3D" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="m 45.963636,172.47273 c -9,0 -13,-8 -7,-13 2,-6 12,-6 14,0 6,5 2,13 -7,13 z" fill="#E53935"/>
-  <path d="m 45.963636,190.47273 c 8,-2 14,3 14,8 -8,0 -14,-4 -14,-8 z" fill="#4CAF50"/>
-
-  <!-- Grass tuft (right of center) -->
-  <path d="m 166.36363,215.85454 q -2,-12 -4,-20" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="m 174.98181,213.52727 q 0,-12 0,-22" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <path d="m 180.98181,213.52727 q 2,-12 4,-18" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" fill="none"/>
-
-  <!-- Small flower (yellow) right -->
-  <circle cx="186.03636" cy="193.60001" r="4" fill="#FFC107"/>
-  <circle cx="186.03636" cy="193.60001" r="1.6" fill="#8D6E4B"/>
-
-  <!-- Small flower (light blue) left -->
-  <circle cx="80.145454" cy="192.43637" r="4" fill="#9FD8F2"/>
-  <circle cx="80.145454" cy="192.43637" r="1.6" fill="#8D6E4B"/>
+  <!-- Sprout: left leaf -->
+  <path d="M128 186
+           C 128 158, 106 142, 80 142
+           C 80 168, 102 186, 128 186 Z"
+        fill="#FFFFFF"/>
 </svg>

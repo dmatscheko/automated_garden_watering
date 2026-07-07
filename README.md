@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images/icon.svg" alt="Pivot Proxy logo" width="96">
+  <img src="images/icon.svg" alt="Automated Garden Watering logo" width="96">
 
 # Automated Garden Watering — Home Assistant Custom Integration
 
