@@ -143,7 +143,8 @@
       "active_zone": {"name": "Aktive Zone"},
       "queue": {"name": "Warteschlange"},
       "step_remaining": {"name": "Restzeit aktueller Schritt"},
-      "queue_remaining": {"name": "Restzeit Warteschlange"}
+      "queue_remaining": {"name": "Restzeit Warteschlange"},
+      "total_duration": {"name": "Gesamte Bewässerungszeit"}
     },
     "button": {
       "water_all": {"name": "Alles bewässern"},
@@ -153,7 +154,8 @@
     "switch": {
       "daily_timer": {"name": "Tages-Timer"},
       "show_details": {"name": "Details anzeigen"},
-      "manual_pump": {"name": "Pumpe (manuell)"}
+      "manual_pump": {"name": "Pumpe (manuell)"},
+      "manual_backwash": {"name": "Rückspülung bei manueller Pumpe"}
     },
     "number": {
       "multiplier": {"name": "Bewässerungs-Multiplikator"}

@@ -149,7 +149,8 @@
       "active_zone": {"name": "Active zone"},
       "queue": {"name": "Queue"},
       "step_remaining": {"name": "Current step time remaining"},
-      "queue_remaining": {"name": "Queue time remaining"}
+      "queue_remaining": {"name": "Queue time remaining"},
+      "total_duration": {"name": "Total watering time"}
     },
     "button": {
       "water_all": {"name": "Water all"},
@@ -159,7 +160,8 @@
     "switch": {
       "daily_timer": {"name": "Daily timer"},
       "show_details": {"name": "Show details"},
-      "manual_pump": {"name": "Pump (manual)"}
+      "manual_pump": {"name": "Pump (manual)"},
+      "manual_backwash": {"name": "Manual pump backwash"}
     },
     "number": {
       "multiplier": {"name": "Watering multiplier"}

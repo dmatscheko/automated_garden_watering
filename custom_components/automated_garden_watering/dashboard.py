@@ -26,6 +26,13 @@ ICON_YELLOW = (
     "var(--state-switch-active-color, "
     "var(--paper-item-icon-active-color, #fdd835))"
 )
+# Idle background of the "Water all" button: a subtle tint of the theme's
+# primary color so the main action stands out from the plain buttons around
+# it. Browsers without color-mix ignore the property (default background),
+# and the green "running" state overrides it while a queue is active.
+WATER_ALL_IDLE_BG = (
+    "color-mix(in srgb, var(--primary-color) 22%, var(--card-background-color))"
+)
 
 
 # Dashboard labels per language (the generated dashboard's visible texts).
@@ -35,11 +42,13 @@ _LABELS = {
         "status": "Status",
         "step_remaining": "Current step time remaining",
         "queue_remaining": "Queue time remaining",
+        "total_duration": "Total watering time",
         "active_zone": "Active zone",
         "queue": "Queue",
         "multiplier": "Watering multiplier",
         "daily_start": "Daily start time",
         "daily_timer": "Daily timer",
+        "manual_backwash": "Backwash during manual pumping",
         "water_all": "Water all / STOP",
         "details": "Details",
         "backwash": "Backwash",
@@ -55,11 +64,13 @@ _LABELS = {
         "status": "Status",
         "step_remaining": "Aktueller Schritt – Restzeit",
         "queue_remaining": "Warteschlange – Restzeit",
+        "total_duration": "Gesamte Bewässerungszeit",
         "active_zone": "Aktive Zone",
         "queue": "Warteschlange",
         "multiplier": "Bewässerungs-Multiplikator",
         "daily_start": "Tägliche Startzeit",
         "daily_timer": "Tages-Timer",
+        "manual_backwash": "Rückspülung bei manueller Pumpe",
         "water_all": "Alles bewässern / STOPP",
         "details": "Details",
         "backwash": "Rückspülung",
@@ -138,10 +149,12 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
     queue = _resolve(hass, entry_id, "queue", "sensor")
     step_remaining = _resolve(hass, entry_id, "step_remaining", "sensor")
     queue_remaining = _resolve(hass, entry_id, "queue_remaining", "sensor")
+    total_duration = _resolve(hass, entry_id, "total_duration", "sensor")
     multiplier = _resolve(hass, entry_id, "multiplier", "number")
     daily_start = _resolve(hass, entry_id, "daily_start", "time")
     daily_timer = _resolve(hass, entry_id, "daily_timer", "switch")
     manual_pump = _resolve(hass, entry_id, "manual_pump", "switch")
+    manual_backwash = _resolve(hass, entry_id, "manual_backwash", "switch")
     details = _resolve(hass, entry_id, "details_visible", "switch")
 
     # Entities card (drop any that couldn't be resolved).
@@ -149,11 +162,13 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         (status, L["status"]),
         (step_remaining, L["step_remaining"]),
         (queue_remaining, L["queue_remaining"]),
+        (total_duration, L["total_duration"]),
         (active_zone, L["active_zone"]),
         (queue, L["queue"]),
         (multiplier, L["multiplier"]),
         (daily_start, L["daily_start"]),
         (daily_timer, L["daily_timer"]),
+        (manual_backwash, L["manual_backwash"]),
     ]
     entities_card = {
         "type": "entities",
@@ -181,7 +196,12 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
         else None
     )
     if water_all_card:
-        water_all_card["styles"] = {"icon": [{"color": ICON_BLUE}]}
+        water_all_card["styles"] = {
+            # Tinted at rest so the primary action is easy to spot; while
+            # running, the state's green background takes precedence.
+            "card": [{"background-color": WATER_ALL_IDLE_BG}],
+            "icon": [{"color": ICON_BLUE}],
+        }
 
     details_card = (
         {

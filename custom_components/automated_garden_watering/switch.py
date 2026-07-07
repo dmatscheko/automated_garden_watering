@@ -28,6 +28,8 @@ async def async_setup_entry(
     ]
     if coordinator.pump_switch:
         entities.append(ManualPumpSwitch(coordinator))
+    if coordinator.pump_switch and coordinator.backwash_switch:
+        entities.append(ManualBackwashSwitch(coordinator))
     async_add_entities(entities)
 
 
@@ -71,6 +73,39 @@ class DetailsSwitch(IrrigationBaseEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_details_visible(False)
+
+
+class ManualBackwashSwitch(IrrigationBaseEntity, SwitchEntity):
+    """Enable automatic backwashes during manual pump (hose) operation.
+
+    While on, manual pump runtime counts toward the same `backwash_interval`
+    as zone watering; when it elapses, the two-stage wash runs and the pump
+    is handed back afterwards. Off (default) keeps backwash a queue-only
+    feature. Persisted across restarts.
+    """
+
+    _attr_translation_key = "manual_backwash"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: IrrigationCoordinator) -> None:
+        super().__init__(coordinator, "manual_backwash")
+
+    @property
+    def available(self) -> bool:
+        return (
+            self.coordinator.pump_switch is not None
+            and self.coordinator.backwash_switch is not None
+        )
+
+    @property
+    def is_on(self) -> bool:
+        return self.coordinator.manual_backwash_enabled
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_manual_backwash_enabled(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.async_set_manual_backwash_enabled(False)
 
 
 class ManualPumpSwitch(IrrigationBaseEntity, SwitchEntity):

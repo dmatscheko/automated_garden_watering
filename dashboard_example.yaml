@@ -31,8 +31,11 @@ cards:
             name: Water all / STOP
             icon: mdi:sprinkler-variant
             show_state: false
-            # Blue icon to match the other 3 main buttons (Details, Backwash, Pump).
+            # Subtle primary-color tint so the main action stands out at rest;
+            # blue icon to match the other 3 main buttons (Details, Backwash, Pump).
             styles:
+              card:
+                - background-color: color-mix(in srgb, var(--primary-color) 22%, var(--card-background-color))
               icon:
                 - color: var(--paper-item-icon-color, var(--state-icon-color))
             tap_action:
@@ -79,6 +82,8 @@ cards:
               name: Current step time remaining
             - entity: sensor.automated_garden_watering_queue_time_remaining
               name: Queue time remaining
+            - entity: sensor.automated_garden_watering_total_watering_time
+              name: Total watering time
             - entity: sensor.automated_garden_watering_active_zone
               name: Active zone
             - entity: sensor.automated_garden_watering_queue
@@ -89,6 +94,8 @@ cards:
               name: Daily start time
             - entity: switch.automated_garden_watering_daily_timer
               name: Daily timer
+            - entity: switch.automated_garden_watering_manual_pump_backwash
+              name: Backwash during manual pumping
 
       # Remaining buttons, same full size: Backwash, Pump, then the zones.
       - type: grid
@@ -191,6 +198,6 @@ cards:
 # * The `custom:button-card` card (HACS frontend) is recommended for colored,
 #   templated zone buttons. Without it, use the built-in `type: button` card —
 #   you lose status coloring but the press action still works.
-# * Times in the UI are shown in seconds. To display M:SS, the status sensor
-#   exposes `phase_remaining_mmss` and `active_remaining_mmss` attributes you
-#   can render with a markdown card.
+# * The countdown sensors (`*_time_remaining`, `*_total_watering_time`) show
+#   H:MM:SS as their state and expose `hours` / `minutes` / `seconds` /
+#   `total_seconds` / `formatted` attributes for custom rendering.

@@ -34,6 +34,8 @@ async def async_get_config_entry_diagnostics(
             "since_last_backwash": rt.since_last_backwash,
             "started_by_timer": rt.started_by_timer,
             "pending_backwash": rt.pending_backwash,
+            "manual_pump_backwash": rt.manual_pump_backwash,
+            "manual_backwash_enabled": coordinator.manual_backwash_enabled,
             "multiplier_runtime": rt.multiplier,
             "multiplier_setting": coordinator.multiplier,
             "daily_start": coordinator.daily_start,

@@ -5,7 +5,8 @@
       "active_zone": {"default": "mdi:water-pump"},
       "queue": {"default": "mdi:format-list-numbered"},
       "step_remaining": {"default": "mdi:timer-sand"},
-      "queue_remaining": {"default": "mdi:timer-outline"}
+      "queue_remaining": {"default": "mdi:timer-outline"},
+      "total_duration": {"default": "mdi:timelapse"}
     },
     "button": {
       "water_all": {"default": "mdi:sprinkler-variant"},
@@ -15,7 +16,8 @@
     "switch": {
       "daily_timer": {"default": "mdi:timer-outline"},
       "show_details": {"default": "mdi:information-outline"},
-      "manual_pump": {"default": "mdi:water-pump"}
+      "manual_pump": {"default": "mdi:water-pump"},
+      "manual_backwash": {"default": "mdi:refresh-auto"}
     },
     "number": {
       "multiplier": {"default": "mdi:multiplication"}

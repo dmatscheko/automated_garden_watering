@@ -519,3 +519,93 @@ async def test_startup_sweep_leaves_manual_pump_alone(
 
     await coord._async_startup_sweep(hass)
     assert _last_call(turn_off, PUMP_ENTITY) is None
+
+
+async def test_full_run_seconds_uses_configured_multiplier(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """full_run_seconds estimates a complete run with the current multiplier."""
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    # Two serial zones of 5s each (max_parallel defaults to 1).
+    assert coord.full_run_seconds() == 10
+    await coord.async_set_multiplier(2.0)
+    assert coord.full_run_seconds() == 20
+
+
+async def test_manual_pump_backwash_interval(
+    hass: HomeAssistant, underlying_switch_states: None
+) -> None:
+    """Manual pump use triggers an interval backwash and hands the pump back."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=make_config(
+            backwash_interval=3, backwash_delay=2,
+            backwash_runtime=3, backwash_flush_runtime=2,
+        ),
+        unique_id=DOMAIN,
+        title="x",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    turn_on, turn_off = register_switch_mocks(hass)
+    coord: IrrigationCoordinator = entry.runtime_data
+
+    await coord.async_set_manual_backwash_enabled(True)
+    hass.states.async_set(PUMP_ENTITY, "on")  # manual (hose) use
+
+    # 3 ticks of pumping reach the interval → the wash starts.
+    await advance(hass, 3)
+    assert coord.rt.state == STATE_BACKWASH_PRESSURE
+    assert coord.rt.manual_pump_backwash is True
+
+    # Drive the wash to completion: pressure(2) + reverse(3) + flush(2).
+    await advance(hass, 7)
+    assert coord.rt.state == STATE_IDLE
+    # The pump was turned off exactly once — for the reverse-flow phase — and
+    # NOT again at the end: manual operation continues.
+    assert len(_calls_for(turn_off, PUMP_ENTITY)) == 1
+    assert _last_call(turn_off, BACKWASH_ENTITY) is not None
+
+
+async def test_manual_pump_no_backwash_when_disabled(
+    hass: HomeAssistant, underlying_switch_states: None
+) -> None:
+    """With the toggle off (default), manual pumping never triggers a wash."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=make_config(backwash_interval=3),
+        unique_id=DOMAIN,
+        title="x",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    register_switch_mocks(hass)
+    coord: IrrigationCoordinator = entry.runtime_data
+
+    hass.states.async_set(PUMP_ENTITY, "on")
+    await advance(hass, 10)
+    assert coord.rt.state == STATE_IDLE
+    assert coord.rt.since_last_backwash == 0
+
+
+async def test_backwash_button_hands_pump_back_when_enabled(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """A manual backwash during hose use restores the pump when the toggle is on."""
+    turn_on, turn_off = mock_switch_services
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    await coord.async_set_manual_backwash_enabled(True)
+    hass.states.async_set(PUMP_ENTITY, "on")
+
+    await coord.async_backwash_now()
+    assert coord.rt.manual_pump_backwash is True
+    # pressure(2) + reverse(3) + flush(2) with conftest timings.
+    await advance(hass, 7)
+    assert coord.rt.state == STATE_IDLE
+    assert len(_calls_for(turn_off, PUMP_ENTITY)) == 1  # reverse flow only

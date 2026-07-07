@@ -62,6 +62,33 @@ async def test_manual_pump_switch(
     )
 
 
+async def test_manual_backwash_switch(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    eid = _find_entity(hass, "switch", "manual_pump_backwash")
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    assert coord.manual_backwash_enabled is False
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": eid}, blocking=True
+    )
+    assert coord.manual_backwash_enabled is True
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": eid}, blocking=True
+    )
+    assert coord.manual_backwash_enabled is False
+
+
+async def test_total_duration_sensor(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Two serial 5s zones → total watering time 0:00:10."""
+    eid = _find_entity(hass, "sensor", "total_watering_time")
+    state = hass.states.get(eid)
+    assert state is not None
+    assert state.state == "0:00:10"
+    assert state.attributes["total_seconds"] == 10
+
+
 async def test_multiplier_number_set(
     hass: HomeAssistant, setup_integration: MockConfigEntry
 ) -> None:

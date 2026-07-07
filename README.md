@@ -21,7 +21,7 @@ What sets it apart from other irrigation integrations: a **two-stage, interval-d
   **parallel execution** via a per-zone `max_parallel` setting (default 1).
 - "Water all" runs every zone in your configured run order.
 - Pump is always turned on first, with configurable pressure build-up delay.
-- Two-stage backwash (pump-off reverse flow + pump-on flush) for a much deeper filter clean; triggered manually at any time, automatically every N minutes of active watering, and at end-of-queue when the run was long enough or was started by the timer.
+- Two-stage backwash (pump-off reverse flow + pump-on flush) for a much deeper filter clean; triggered manually at any time, automatically every N minutes of active watering, and at end-of-queue when the run was long enough or was started by the timer. Optionally (via the *Manual pump backwash* switch) the same interval also covers manual pump (hose) use — the pump is handed back after the wash.
 - Global watering duration multiplier (e.g. `2.5` = water 2.5× longer than the per-zone default).
 - Daily start timer with on/off switch. If the timer fires while a run is
   already active, the remaining zones are appended to the queue (the run is
@@ -117,6 +117,7 @@ cleans the filter far better than just opening the valve:
 | `button.automated_garden_watering_backwash` | Immediate backwash (never queued). Attributes `status` (`running`/`idle`) for coloring and `last_run` / `last_run_friendly` for showing when it last ran (persisted across restarts). |
 | `button.automated_garden_watering_zone_<name-slug>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<name-slug>` suffix is the slugified zone display name (e.g. `Fensterblumen` → `…_zone_fensterblumen`), so the entity_id stays meaningful and survives reordering. If two zones slugify to the same value, the lower-`order` one keeps the bare slug and the other gets `_2`, `_3`, … appended. The friendly name is also in the `zone_name` attribute. Attributes `last_run` (ISO) and `last_run_friendly` (e.g. `Today 14:30`, `Yesterday 09:00`, `Mon 09:00`, `May 03`) record when the zone last watered (persisted across restarts). |
 | `switch.automated_garden_watering_pump_manual` | Manual well-pump control for e.g. a garden hose (only created if a pump is configured). Manual control is blocked while a queue/backwash is active (the state machine owns the pump then), so neither the pump-first rule nor the pump-off reverse-flow stage can be broken manually. Attributes `status`, `last_run`, `last_run_friendly`, `controlled_by` (`manual`/`automation`) — so it can be shown as a button with a last-run line like the zones. |
+| `switch.automated_garden_watering_manual_pump_backwash` | Enables automatic backwashes during **manual pump** (hose) use (created when both pump and backwash valve are configured; off by default, persisted across restarts). While on, manual pumping counts toward the same *Automatic backwash interval* as zone watering; when it elapses, the two-stage wash runs and the pump is turned back on afterwards so the hose session continues. Also applies to the Backwash button: pressed during hose use, the pump is handed back after the wash. |
 | `button.automated_garden_watering_dashboard_yaml` | Config button (display name *Dashboard YAML*): generates a complete dashboard YAML for your exact entities/zones and shows it in a notification you can copy from. |
 | `number.automated_garden_watering_watering_multiplier` | Global watering multiplier. |
 | `time.automated_garden_watering_daily_start_time` | Daily start time. |
@@ -127,6 +128,7 @@ cleans the filter far better than just opening the valve:
 | `sensor.automated_garden_watering_queue` | Comma-separated upcoming zones. |
 | `sensor.automated_garden_watering_current_step_time_remaining` | Countdown (`H:MM:SS`) for the active zone, or the backwash while it runs. Attributes: `hours`, `minutes`, `seconds`, `total_seconds`, `phase`, `label`. Updates every second — see *Database / recorder* below. |
 | `sensor.automated_garden_watering_queue_time_remaining` | Countdown (`H:MM:SS`) of all remaining watering in the queue. Pauses (holds steady) during backwash. Attributes: `hours`, `minutes`, `seconds`, `total_seconds`. Updates every second — see *Database / recorder* below. |
+| `sensor.automated_garden_watering_total_watering_time` | How long a complete *Water all* run takes (`H:MM:SS`) at the current multiplier — already shortened by zones that water in parallel (each group counts only its longest member). Excludes pump-pressure and backwash time. Only changes when zones, durations, or the multiplier change. |
 
 ## Database / recorder
 
@@ -194,7 +196,9 @@ unknown zone, no backwash valve configured, or the integration not yet set up.
 - **Rain skip** — feed a rain sensor into an automation that flips
   `switch.<…>_daily_timer` off for the day (and back on the next morning).
 - **Hose-only operation** — if you have no zone valves but want pump
-  coordination, leave zones empty and just use the manual pump switch.
+  coordination, leave zones empty and just use the manual pump switch. Turn on
+  *Manual pump backwash* so long hose sessions get the same interval-based
+  filter cleaning as zone runs.
 - **Filter-friendly long runs** — for orchards or long rows, set
   `backwash_interval` to a few minutes so the filter is cleaned mid-cycle
   rather than only at the end.

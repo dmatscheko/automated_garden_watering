@@ -46,6 +46,7 @@ async def async_setup_entry(
             QueueSensor(coordinator),
             CurrentStepRemainingSensor(coordinator),
             QueueRemainingSensor(coordinator),
+            TotalDurationSensor(coordinator),
         ]
     )
 
@@ -206,6 +207,31 @@ class CurrentStepRemainingSensor(IrrigationBaseEntity, SensorEntity):
             if names
             else ("Backwash" if rt.state in BACKWASH_ACTIVE_STATES else "—")
         )
+        return attrs
+
+
+class TotalDurationSensor(IrrigationBaseEntity, SensorEntity):
+    """Duration of a full 'Water all' run at the current multiplier.
+
+    Already accounts for zones that water in parallel (each group counts
+    with its longest member only). Changes only when zones, durations, or
+    the multiplier change — recorder-friendly, unlike the live countdowns.
+    """
+
+    _attr_translation_key = "total_duration"
+
+    def __init__(self, coordinator: IrrigationCoordinator) -> None:
+        super().__init__(coordinator, "total_duration")
+
+    @property
+    def native_value(self) -> str:
+        return _fmt_hms(self.coordinator.full_run_seconds())
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attrs = _hms_attrs(self.coordinator.full_run_seconds())
+        attrs["zone_count"] = len(self.coordinator.zones)
+        attrs["multiplier"] = self.coordinator.multiplier
         return attrs
 
 

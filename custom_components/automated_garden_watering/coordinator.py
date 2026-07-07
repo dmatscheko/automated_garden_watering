@@ -105,6 +105,9 @@ class RuntimeState:
     pending_backwash: bool = False
     multiplier: float = DEFAULT_MULTIPLIER
     pump_pressure_done: bool = False  # True once initial pump_delay has elapsed
+    # True while a backwash that was triggered during manual pump (hose) use
+    # is running: afterwards the pump is left ON and we return to idle.
+    manual_pump_backwash: bool = False
 
 
 class IrrigationCoordinator:
@@ -127,6 +130,9 @@ class IrrigationCoordinator:
         self.pump_last_run: datetime | None = None
         self.backwash_last_run: datetime | None = None
         self.details_visible: bool = False
+        # Automatically backwash every `backwash_interval` seconds of manual
+        # pump (hose) use, too. User preference, persisted like details_visible.
+        self.manual_backwash_enabled: bool = False
         self._reload_config(data)
 
     # ---------- configuration ----------
@@ -208,11 +214,12 @@ class IrrigationCoordinator:
             default=999,
         )
 
-    def _zone_full_seconds(self, zone_id: str) -> int:
+    def _zone_full_seconds(self, zone_id: str, multiplier: float | None = None) -> int:
         zone = self.zones.get(zone_id)
         if not zone:
             return 0
-        return max(1, int(round(zone.duration * self.rt.multiplier)))
+        mult = self.rt.multiplier if multiplier is None else multiplier
+        return max(1, int(round(zone.duration * mult)))
 
     def current_step_remaining_seconds(self) -> int:
         """Seconds left in the current step.
@@ -256,7 +263,11 @@ class IrrigationCoordinator:
         return self._simulate_remaining_groups(rt.queue, 0)
 
     def _simulate_group_duration(
-        self, queue: list[str], start: int, initial_cap: int
+        self,
+        queue: list[str],
+        start: int,
+        initial_cap: int,
+        multiplier: float | None = None,
     ) -> tuple[int, int]:
         """Return (group_max_duration_seconds, next_index_after_group)."""
         if start >= len(queue):
@@ -266,7 +277,7 @@ class IrrigationCoordinator:
             return 0, start + 1
         cap = min(initial_cap, first.max_parallel)
         group_size = 1
-        durations = [self._zone_full_seconds(first.id)]
+        durations = [self._zone_full_seconds(first.id, multiplier)]
         j = start + 1
         while j < len(queue) and group_size < cap:
             cand = self.zones.get(queue[j])
@@ -275,13 +286,15 @@ class IrrigationCoordinator:
                 continue
             if group_size + 1 > cand.max_parallel:
                 break
-            durations.append(self._zone_full_seconds(cand.id))
+            durations.append(self._zone_full_seconds(cand.id, multiplier))
             cap = min(cap, cand.max_parallel)
             group_size += 1
             j += 1
         return max(durations), j
 
-    def _simulate_remaining_groups(self, queue: list[str], start: int) -> int:
+    def _simulate_remaining_groups(
+        self, queue: list[str], start: int, multiplier: float | None = None
+    ) -> int:
         total = 0
         i = start
         while i < len(queue):
@@ -289,9 +302,22 @@ class IrrigationCoordinator:
             if not first:
                 i += 1
                 continue
-            dur, i = self._simulate_group_duration(queue, i, first.max_parallel)
+            dur, i = self._simulate_group_duration(
+                queue, i, first.max_parallel, multiplier
+            )
             total += dur
         return total
+
+    def full_run_seconds(self) -> int:
+        """Duration of a complete 'Water all' run at the current multiplier.
+
+        Simulates the parallel groups the full zone list would form, so the
+        estimate already includes the time saved by zones watering together.
+        Excludes the pump-pressure delay and any backwash time.
+        """
+        return self._simulate_remaining_groups(
+            self.ordered_zone_ids(), 0, multiplier=self.multiplier
+        )
 
     @callback
     def _notify(self) -> None:
@@ -323,6 +349,13 @@ class IrrigationCoordinator:
         self.pump_last_run = dt_util.now()
         self._persist_last_run()
 
+    def _pump_is_on(self) -> bool:
+        """Whether the configured pump switch currently reports 'on'."""
+        if not self.pump_switch:
+            return False
+        state = self.hass.states.get(self.pump_switch)
+        return bool(state and state.state == STATE_ON)
+
     # ---------- lifecycle ----------
 
     async def async_start(self) -> None:
@@ -340,6 +373,9 @@ class IrrigationCoordinator:
                     stored["backwash_last_run"]
                 )
             self.details_visible = bool(stored.get("details_visible", False))
+            self.manual_backwash_enabled = bool(
+                stored.get("manual_backwash_enabled", False)
+            )
 
         self._tick_unsub = async_track_time_interval(
             self.hass, self._on_tick, timedelta(seconds=1)
@@ -416,12 +452,18 @@ class IrrigationCoordinator:
                     else None
                 ),
                 "details_visible": self.details_visible,
+                "manual_backwash_enabled": self.manual_backwash_enabled,
             },
             2,
         )
 
     async def async_set_details_visible(self, value: bool) -> None:
         self.details_visible = bool(value)
+        self._persist_last_run()
+        self._notify()
+
+    async def async_set_manual_backwash_enabled(self, value: bool) -> None:
+        self.manual_backwash_enabled = bool(value)
         self._persist_last_run()
         self._notify()
 
@@ -532,6 +574,19 @@ class IrrigationCoordinator:
                 else:
                     # Subsequent groups within the same queue start without pump delay.
                     await self._start_group_from_queue()
+            elif (
+                self.manual_backwash_enabled
+                and self.backwash_switch
+                and self.backwash_interval > 0
+                and self._pump_is_on()
+            ):
+                # Manual pump (hose) use: the filter sees the same water flow
+                # as a zone run, so count it toward the backwash interval and
+                # wash automatically. The pump is restored afterwards.
+                rt.since_last_backwash += 1
+                if rt.since_last_backwash >= self.backwash_interval:
+                    rt.manual_pump_backwash = True
+                    await self._enter_backwash_pressure(triggered_during_run=False)
             return
 
         if rt.state == STATE_PUMP_PRESSURE:
@@ -732,9 +787,17 @@ class IrrigationCoordinator:
         await self._switch(self.backwash_switch, False)
         rt.since_last_backwash = 0
         if rt.paused:
+            rt.manual_pump_backwash = False
             await self._resume_paused()
         elif rt.queue:
+            # A queue was started during the wash — it takes over from here.
+            rt.manual_pump_backwash = False
             await self._start_group_from_queue()
+        elif rt.manual_pump_backwash:
+            # Wash was triggered during manual pump (hose) use: the flush
+            # phase already turned the pump back on — leave it running and
+            # return to idle so the manual session continues seamlessly.
+            self.rt = RuntimeState()
         else:
             await self._finish_queue()
 
@@ -840,6 +903,12 @@ class IrrigationCoordinator:
             rt.pending_backwash = True
             if rt.state == STATE_IDLE:
                 rt.pending_backwash = False
+                # With the manual-pump-backwash option on, a wash started
+                # while the pump is in manual (hose) use hands the pump back
+                # afterwards instead of shutting everything off.
+                rt.manual_pump_backwash = (
+                    self.manual_backwash_enabled and self._pump_is_on()
+                )
                 await self._enter_backwash_pressure(triggered_during_run=False)
         self._notify()
 

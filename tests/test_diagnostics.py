@@ -58,3 +58,17 @@ async def test_dashboard_yaml_button_press(
         {"entity_id": button_states[0].entity_id},
         blocking=True,
     )
+
+
+async def test_dashboard_yaml_content(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Generated YAML: water-all tint plus the new details-panel rows."""
+    from custom_components.automated_garden_watering.dashboard import build_dashboard
+
+    yaml_text = build_dashboard(hass, setup_integration.runtime_data)
+    # Water all stands out with a primary-color tint at rest.
+    assert "color-mix(in srgb, var(--primary-color)" in yaml_text
+    # Total watering time and the manual-pump backwash toggle are listed.
+    assert "total_watering_time" in yaml_text
+    assert "manual_pump_backwash" in yaml_text

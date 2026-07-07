@@ -249,6 +249,21 @@ async def test_queue_remaining_with_parallel_groups(
     assert 9 <= remaining <= 13, remaining
 
 
+async def test_full_run_seconds_accounts_for_parallel(
+    hass: HomeAssistant, setup_with: Any
+) -> None:
+    """The total-duration estimate counts each parallel group only once."""
+    coord = await setup_with(
+        [
+            _z("a", duration=5, parallel=2, order=1),
+            _z("b", duration=8, parallel=2, order=2),  # groups with A → max 8
+            _z("c", duration=4, parallel=1, order=3),  # runs alone → 4
+        ]
+    )
+    # Serial sum would be 17; the parallel-aware estimate is 8 + 4 = 12.
+    assert coord.full_run_seconds() == 12
+
+
 async def test_backwash_pauses_and_resumes_all_parallel_zones(
     hass: HomeAssistant, setup_with: Any
 ) -> None:
