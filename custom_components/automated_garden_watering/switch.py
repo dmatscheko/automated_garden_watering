@@ -76,10 +76,10 @@ class DetailsSwitch(IrrigationBaseEntity, SwitchEntity):
 class ManualPumpSwitch(IrrigationBaseEntity, SwitchEntity):
     """Direct manual control of the well pump (e.g. to feed a garden hose).
 
-    Mirrors the configured pump switch. Turning it OFF is blocked while an
-    irrigation queue / backwash is running, so manual use can't break the
-    'pump must be on before any valve' safety rule. Use 'Water all' a second
-    time to stop an active run.
+    Mirrors the configured pump switch. Manual control is blocked while an
+    irrigation queue / backwash is running — the state machine owns the pump
+    then, and a manual ON would defeat the pump-off reverse-flow stage of a
+    backwash. Use 'Water all' a second time to stop an active run.
     """
 
     _attr_translation_key = "manual_pump"

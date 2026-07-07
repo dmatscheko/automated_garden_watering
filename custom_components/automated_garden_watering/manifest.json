@@ -7,7 +7,7 @@
   "iot_class": "local_push",
   "quality_scale": "custom",
   "codeowners": ["@dmatscheko"],
-  "dependencies": [],
+  "dependencies": ["persistent_notification"],
   "requirements": [],
   "documentation": "https://github.com/dmatscheko/automated_garden_watering",
   "issue_tracker": "https://github.com/dmatscheko/automated_garden_watering/issues"

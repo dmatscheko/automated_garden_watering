@@ -12,6 +12,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import slugify
 
@@ -23,7 +24,7 @@ from .const import (
     DOMAIN,
     STATE_IDLE,
 )
-from .coordinator import IrrigationCoordinator
+from .coordinator import STORAGE_VERSION, IrrigationCoordinator
 from .repairs import async_sync_issues
 
 _LOGGER = logging.getLogger(__name__)
@@ -271,3 +272,11 @@ async def async_unload_entry(
     if unload_ok and (coordinator := getattr(entry, "runtime_data", None)):
         await coordinator.async_stop()
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Delete the persisted last-run store of a removed entry."""
+    store: Store[dict[str, Any]] = Store(
+        hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}"
+    )
+    await store.async_remove()

@@ -16,10 +16,19 @@ from dataclasses import dataclass, field
 from datetime import time as dt_time, datetime, timedelta
 from typing import Any
 
-from homeassistant.const import SERVICE_TURN_OFF, SERVICE_TURN_ON
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.const import (
+    EVENT_HOMEASSISTANT_STOP,
+    SERVICE_TURN_OFF,
+    SERVICE_TURN_ON,
+    STATE_ON,
+)
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.event import (
+    async_track_time_change,
+    async_track_time_interval,
+)
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -90,8 +99,8 @@ class RuntimeState:
     # seconds we restore on `_after_backwash`.
     paused: dict[str, int] = field(default_factory=dict)
     phase_remaining: int = 0  # seconds left in current pump/backwash phase
-    accumulated_watering: int = 0  # wall-clock seconds with ≥1 zone running
-    since_last_backwash: int = 0   # wall-clock seconds since last backwash
+    accumulated_watering: int = 0  # watering seconds (≥1 zone running) this queue
+    since_last_backwash: int = 0   # watering seconds since the last backwash
     started_by_timer: bool = False
     pending_backwash: bool = False
     multiplier: float = DEFAULT_MULTIPLIER
@@ -108,6 +117,8 @@ class IrrigationCoordinator:
         self._lock = asyncio.Lock()
         self._tick_unsub: CALLBACK_TYPE | None = None
         self._daily_unsub: CALLBACK_TYPE | None = None
+        self._stop_unsub: CALLBACK_TYPE | None = None
+        self._started_unsub: CALLBACK_TYPE | None = None
         self.rt = RuntimeState()
         self._store: Store[dict[str, Any]] = Store(
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}"
@@ -188,9 +199,14 @@ class IrrigationCoordinator:
 
     def _group_cap(self) -> int:
         """Lowest max_parallel across currently-active zones (∞ if empty)."""
-        if not self.rt.active:
-            return 999
-        return min(self.zones[zid].max_parallel for zid in self.rt.active if zid in self.zones)
+        return min(
+            (
+                self.zones[zid].max_parallel
+                for zid in self.rt.active
+                if zid in self.zones
+            ),
+            default=999,
+        )
 
     def _zone_full_seconds(self, zone_id: str) -> int:
         zone = self.zones.get(zone_id)
@@ -218,36 +234,26 @@ class IrrigationCoordinator:
 
         Excludes backwash time. Models parallel groups by simulating group
         formation from the queue head: each group's contribution is the max
-        zone duration in that group (they water concurrently).
+        zone duration in that group (they water concurrently). Zones paused
+        for a backwash count with their preserved remaining seconds, so the
+        countdown holds steady while the wash runs.
         """
         rt = self.rt
         if rt.state == STATE_IDLE:
             return 0
 
-        total = 0
-        # Active group: parallel runtime is the longest remaining.
-        if rt.active:
-            if any(v > 0 for v in rt.active.values()):
-                total += max(rt.active.values())
-            elif rt.queue:
-                # Paused mid-backwash with all counters at 0 shouldn't happen;
-                # if it does, fall back to a fresh start of the head zone.
-                total += self._zone_full_seconds(rt.queue[0])
-        elif rt.state != STATE_IDLE and rt.queue:
-            # Pump-pressure phase: the head group hasn't started yet. Take its
-            # full duration as the first group's contribution.
-            head_zone = self.zones.get(rt.queue[0])
-            head_cap = head_zone.max_parallel if head_zone else 1
-            total += self._simulate_group_duration(rt.queue, 0, head_cap)[0]
-            # Skip past the simulated head group below.
-            i = self._simulate_group_duration(rt.queue, 0, head_cap)[1]
-            total += self._simulate_remaining_groups(rt.queue, i)
-            return total
+        # Current group: running zones, or the paused snapshot during a
+        # backwash. Its parallel runtime is the longest remaining counter.
+        current = rt.active or rt.paused
+        if current:
+            queued = [zid for zid in rt.queue if zid not in current]
+            return max(0, max(current.values())) + self._simulate_remaining_groups(
+                queued, 0
+            )
 
-        # Future groups (queued zones not yet in the active set):
-        queued = [zid for zid in rt.queue if zid not in rt.active]
-        total += self._simulate_remaining_groups(queued, 0)
-        return total
+        # No group has started yet (pump-pressure phase): simulate all groups
+        # from the queue head.
+        return self._simulate_remaining_groups(rt.queue, 0)
 
     def _simulate_group_duration(
         self, queue: list[str], start: int, initial_cap: int
@@ -320,8 +326,6 @@ class IrrigationCoordinator:
     # ---------- lifecycle ----------
 
     async def async_start(self) -> None:
-        from homeassistant.helpers.event import async_track_time_interval
-
         stored = await self._store.async_load()
         if stored:
             if isinstance(stored.get("last_run"), dict):
@@ -341,6 +345,60 @@ class IrrigationCoordinator:
             self.hass, self._on_tick, timedelta(seconds=1)
         )
         self._reschedule_daily_timer()
+        # Runtime state is not persisted: if HA stops (or previously crashed)
+        # mid-run, nothing would ever close the hardware again. Shut everything
+        # off on HA stop, and sweep for stray "on" switches once HA is started.
+        self._stop_unsub = self.hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_STOP, self._on_hass_stop
+        )
+        self._started_unsub = async_at_started(self.hass, self._async_startup_sweep)
+
+    async def _on_hass_stop(self, _event: Event) -> None:
+        """Close all watering hardware if Home Assistant stops mid-run."""
+        self._stop_unsub = None  # one-time listener has consumed itself
+        async with self._lock:
+            rt = self.rt
+            if rt.state == STATE_IDLE and not rt.active and not rt.queue:
+                return
+            _LOGGER.warning(
+                "Home Assistant is stopping during irrigation (state=%s); "
+                "closing all valves and turning the pump off",
+                rt.state,
+            )
+            await self._finish_queue()
+
+    async def _async_startup_sweep(self, _hass: HomeAssistant) -> None:
+        """Close watering hardware left on by a crash / unclean restart.
+
+        After a restart the coordinator is idle, so any zone or backwash valve
+        that still reports 'on' was left behind by an interrupted run. The
+        pump is only turned off when such a stray valve was found — a pump
+        running on its own may be deliberate manual (hose) use.
+        """
+        async with self._lock:
+            rt = self.rt
+            if rt.state != STATE_IDLE or rt.active or rt.queue:
+                return
+            valve_ids = [z.entity_id for z in self.zones.values()]
+            if self.backwash_switch:
+                valve_ids.append(self.backwash_switch)
+            stray = False
+            for entity_id in valve_ids:
+                state = self.hass.states.get(entity_id)
+                if state and state.state == STATE_ON:
+                    stray = True
+                    _LOGGER.warning(
+                        "Closing %s — it was left on by an interrupted run", entity_id
+                    )
+                    await self._switch(entity_id, False)
+            if stray and self.pump_switch:
+                pump_state = self.hass.states.get(self.pump_switch)
+                if pump_state and pump_state.state == STATE_ON:
+                    _LOGGER.warning(
+                        "Turning off pump %s — it was left on by an interrupted run",
+                        self.pump_switch,
+                    )
+                    await self._switch(self.pump_switch, False)
 
     @callback
     def _persist_last_run(self) -> None:
@@ -410,6 +468,12 @@ class IrrigationCoordinator:
         if self._daily_unsub:
             self._daily_unsub()
             self._daily_unsub = None
+        if self._stop_unsub:
+            self._stop_unsub()
+            self._stop_unsub = None
+        if self._started_unsub:
+            self._started_unsub()
+            self._started_unsub = None
         await self._close_all_zone_valves()
         await self._switch(self.backwash_switch, False)
         await self._switch(self.pump_switch, False)
@@ -427,6 +491,9 @@ class IrrigationCoordinator:
             while len(parts) < 3:
                 parts.append(0)
             hh, mm, ss = parts[0], parts[1], parts[2]
+            # dt_time() range-checks for us; out-of-range values (e.g. "25:00")
+            # must hit the same fallback as unparseable ones.
+            dt_time(hh, mm, ss)
         except (ValueError, IndexError):
             _LOGGER.warning("Invalid daily_start %s, using default", self.daily_start)
             hh, mm, ss = 6, 0, 0
@@ -616,7 +683,12 @@ class IrrigationCoordinator:
         """
         rt = self.rt
         if not self.backwash_switch:
-            if rt.queue or rt.active:
+            # Backwash valve no longer configured (e.g. cleared in options
+            # mid-run): skip the wash but keep watering — resume any paused
+            # zones or continue with the queue.
+            if rt.paused:
+                await self._resume_paused()
+            elif rt.queue:
                 await self._start_group_from_queue()
             else:
                 await self._finish_queue()
@@ -637,21 +709,30 @@ class IrrigationCoordinator:
         rt.state = STATE_BACKWASH
         rt.phase_remaining = max(1, self.backwash_runtime)
 
+    async def _resume_paused(self) -> None:
+        """Re-open every paused zone and continue watering where it left off."""
+        rt = self.rt
+        for zid, remaining in rt.paused.items():
+            zone = self.zones.get(zid)
+            if zone:
+                rt.active[zid] = remaining
+                await self._switch(zone.entity_id, True)
+        rt.paused.clear()
+        if rt.active:
+            rt.state = STATE_WATERING
+            await self._refill_active_set()
+        elif rt.queue:
+            # All paused zones vanished from the config — carry on with the queue.
+            await self._start_group_from_queue()
+        else:
+            await self._finish_queue()
+
     async def _after_backwash(self) -> None:
         rt = self.rt
         await self._switch(self.backwash_switch, False)
         rt.since_last_backwash = 0
         if rt.paused:
-            # Resume every paused zone (their valves re-open, remaining counters
-            # picked up where they left off).
-            for zid, remaining in rt.paused.items():
-                zone = self.zones.get(zid)
-                if zone:
-                    rt.active[zid] = remaining
-                    await self._switch(zone.entity_id, True)
-            rt.paused.clear()
-            await self._refill_active_set()
-            rt.state = STATE_WATERING
+            await self._resume_paused()
         elif rt.queue:
             await self._start_group_from_queue()
         else:
@@ -692,6 +773,10 @@ class IrrigationCoordinator:
                 else:
                     # Other zones still running; try to refill.
                     await self._refill_active_set()
+            # Paused for a backwash? Cancel its scheduled resume (the valve is
+            # already closed). The backwash itself carries on.
+            elif zone_id in rt.paused:
+                del rt.paused[zone_id]
             # Queued (but not active)? Dequeue.
             elif zone_id in rt.queue:
                 rt.queue.remove(zone_id)
@@ -715,16 +800,29 @@ class IrrigationCoordinator:
     async def async_water_all(self, from_timer: bool = False) -> None:
         async with self._lock:
             rt = self.rt
-            if rt.queue or rt.active or rt.state != STATE_IDLE:
+            busy = bool(rt.queue or rt.active or rt.paused or rt.state != STATE_IDLE)
+            if not busy:
+                rt.multiplier = self.multiplier
+                rt.started_by_timer = from_timer
+                rt.queue = self.ordered_zone_ids()
+            elif from_timer:
+                # The daily timer must never act as an emergency stop. Top up
+                # the queue with every zone not already running / queued /
+                # paused, so the scheduled watering still happens after the
+                # current run.
+                rt.started_by_timer = True
+                skip = set(rt.queue) | set(rt.active) | set(rt.paused)
+                rt.queue.extend(
+                    zid for zid in self.ordered_zone_ids() if zid not in skip
+                )
+                if rt.state == STATE_WATERING and rt.active:
+                    await self._refill_active_set()
+            else:
                 # Emergency stop (no backwash).
                 await self._close_all_zone_valves()
                 await self._switch(self.backwash_switch, False)
                 await self._switch(self.pump_switch, False)
                 self.rt = RuntimeState()
-            else:
-                rt.multiplier = self.multiplier
-                rt.started_by_timer = from_timer
-                rt.queue = self.ordered_zone_ids()
         self._notify()
 
     async def async_backwash_now(self) -> None:
@@ -748,9 +846,12 @@ class IrrigationCoordinator:
     async def async_manual_pump(self, on: bool) -> bool:
         if not self.pump_switch:
             return False
-        if not on and self.rt.state != STATE_IDLE:
+        if self.rt.state != STATE_IDLE:
+            # The state machine owns the pump while a run or backwash is
+            # active. Turning it off would starve open valves; turning it on
+            # would defeat the pump-off reverse-flow phase of a backwash.
             _LOGGER.warning(
-                "Refusing manual pump-off while irrigation is active (state=%s)",
+                "Refusing manual pump control while irrigation is active (state=%s)",
                 self.rt.state,
             )
             return False

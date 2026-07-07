@@ -172,6 +172,23 @@ async def test_zone_button_unavailable_when_switch_missing(
     assert states[0].state == "unavailable"
 
 
+async def test_remove_entry_deletes_store(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    hass_storage: dict,
+) -> None:
+    """Removing the config entry deletes its persisted last-run store."""
+    entry = setup_integration
+    coord: IrrigationCoordinator = entry.runtime_data
+    await coord._store.async_save({"last_run": {}})
+    key = f"{DOMAIN}.{entry.entry_id}"
+    assert key in hass_storage
+
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert key not in hass_storage
+
+
 async def test_options_updated_triggers_reload_when_zones_change(
     hass: HomeAssistant, setup_integration: MockConfigEntry
 ) -> None:

@@ -23,7 +23,9 @@ What sets it apart from other irrigation integrations: a **two-stage, interval-d
 - Pump is always turned on first, with configurable pressure build-up delay.
 - Two-stage backwash (pump-off reverse flow + pump-on flush) for a much deeper filter clean; triggered manually at any time, automatically every N minutes of active watering, and at end-of-queue when the run was long enough or was started by the timer.
 - Global watering duration multiplier (e.g. `2.5` = water 2.5× longer than the per-zone default).
-- Daily start timer with on/off switch.
+- Daily start timer with on/off switch. If the timer fires while a run is
+  already active, the remaining zones are appended to the queue (the run is
+  never interrupted).
 - Status sensor & queue sensor for dashboards.
 - UI available in English and German.
 
@@ -114,7 +116,7 @@ cleans the filter far better than just opening the valve:
 | `button.automated_garden_watering_water_all` | Run all zones in order; pressing again while queue is active = emergency stop. Attribute `running` for coloring. |
 | `button.automated_garden_watering_backwash` | Immediate backwash (never queued). Attributes `status` (`running`/`idle`) for coloring and `last_run` / `last_run_friendly` for showing when it last ran (persisted across restarts). |
 | `button.automated_garden_watering_zone_<name-slug>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<name-slug>` suffix is the slugified zone display name (e.g. `Fensterblumen` → `…_zone_fensterblumen`), so the entity_id stays meaningful and survives reordering. If two zones slugify to the same value, the lower-`order` one keeps the bare slug and the other gets `_2`, `_3`, … appended. The friendly name is also in the `zone_name` attribute. Attributes `last_run` (ISO) and `last_run_friendly` (e.g. `Today 14:30`, `Yesterday 09:00`, `Mon 09:00`, `May 03`) record when the zone last watered (persisted across restarts). |
-| `switch.automated_garden_watering_pump_manual` | Manual well-pump control for e.g. a garden hose (only created if a pump is configured). Turning it **off** is blocked while a queue/backwash is active so the pump-first safety rule can't be broken manually. Attributes `status`, `last_run`, `last_run_friendly`, `controlled_by` (`manual`/`automation`) — so it can be shown as a button with a last-run line like the zones. |
+| `switch.automated_garden_watering_pump_manual` | Manual well-pump control for e.g. a garden hose (only created if a pump is configured). Manual control is blocked while a queue/backwash is active (the state machine owns the pump then), so neither the pump-first rule nor the pump-off reverse-flow stage can be broken manually. Attributes `status`, `last_run`, `last_run_friendly`, `controlled_by` (`manual`/`automation`) — so it can be shown as a button with a last-run line like the zones. |
 | `button.automated_garden_watering_dashboard_yaml` | Config button (display name *Dashboard YAML*): generates a complete dashboard YAML for your exact entities/zones and shows it in a notification you can copy from. |
 | `number.automated_garden_watering_watering_multiplier` | Global watering multiplier. |
 | `time.automated_garden_watering_daily_start_time` | Daily start time. |
@@ -152,9 +154,14 @@ prefix to your device name).
 ## Safety
 
 - The pump is always turned on before any **zone** valve opens.
-- Only one zone valve is ever open at a time.
+- Zones only run simultaneously when every member of the group allows it
+  (`max_parallel`); with the default of 1, only one zone valve is ever open
+  at a time.
 - No zone runs during backwash.
 - On stop / completion, all valves and the pump are closed.
+- If Home Assistant stops or restarts mid-run, everything is shut off on the
+  stop event, and after startup any valve still reporting `on` from an
+  interrupted run (e.g. after a crash or power loss) is closed again.
 
 > Note: the backwash *reverse-flow* stage intentionally runs with the pump
 > **off** while the backwash valve is open — this is required so water can flow

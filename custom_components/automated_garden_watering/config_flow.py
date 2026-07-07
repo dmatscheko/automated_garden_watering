@@ -41,6 +41,24 @@ from .const import (
 # edit screen instead of from the zone list.
 CONF_ZONE_DELETE = "delete_zone"
 
+# Optional entity-selector fields: when the user clears them, the key is
+# simply absent from user_input, so saving must write an explicit None or the
+# old value survives the data/options merge.
+OPTIONAL_SWITCH_KEYS = (CONF_PUMP, CONF_BACKWASH)
+
+# Every key managed by the global-settings form (shared by the initial setup,
+# the reconfigure flow, and the options flow).
+GLOBAL_KEYS = (
+    CONF_PUMP,
+    CONF_BACKWASH,
+    CONF_PUMP_DELAY,
+    CONF_BACKWASH_DELAY,
+    CONF_BACKWASH_RUNTIME,
+    CONF_BACKWASH_FLUSH_RUNTIME,
+    CONF_BACKWASH_INTERVAL,
+    CONF_BACKWASH_THRESHOLD,
+)
+
 SWITCH_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="switch")
 )
@@ -229,7 +247,20 @@ class AutomatedGardenWateringConfigFlow(config_entries.ConfigFlow, domain=DOMAIN
         defaults: dict[str, Any] = {**dict(entry.data), **(dict(entry.options) if entry.options else {})}
         if user_input is not None:
             new_data: dict[str, Any] = {**dict(entry.data), **user_input}
-            return self.async_update_reload_and_abort(entry, data=new_data)
+            for key in OPTIONAL_SWITCH_KEYS:
+                # Cleared selector → key absent → store an explicit None.
+                new_data[key] = user_input.get(key) or None
+            # The options flow mirrors global keys into entry.options, which
+            # would shadow this form's result via the data/options merge —
+            # drop them from options so the reconfigured values apply.
+            new_options = {
+                k: v
+                for k, v in dict(entry.options or {}).items()
+                if k not in GLOBAL_KEYS
+            }
+            return self.async_update_reload_and_abort(
+                entry, data=new_data, options=new_options
+            )
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=_global_schema({k: v for k, v in defaults.items() if k != CONF_ZONES}),
@@ -261,6 +292,11 @@ class AutomatedGardenWateringOptionsFlow(config_entries.OptionsFlow):
     async def async_step_globals(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             self._globals.update(user_input)
+            for key in OPTIONAL_SWITCH_KEYS:
+                # Cleared selector → key absent from user_input → write an
+                # explicit None so the merge with entry.data can't resurrect
+                # the previously configured switch.
+                self._globals[key] = user_input.get(key) or None
             return await self._save_and_exit()
         return self.async_show_form(
             step_id="globals", data_schema=_global_schema(self._globals)

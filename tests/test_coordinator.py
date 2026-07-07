@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.automated_garden_watering.const import (
+    BACKWASH_ACTIVE_STATES,
     DOMAIN,
     STATE_BACKWASH,
     STATE_BACKWASH_FLUSH,
@@ -373,3 +374,148 @@ async def test_remaining_helpers(
     assert coord.current_step_remaining_seconds() > 0
     # Now we have an active zone (z1, 5s) + queued zone (z2, 5s) → ~10s left.
     assert coord.queue_remaining_seconds() > 0
+
+
+async def test_daily_timer_fire_does_not_stop_active_run(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """A timer-started water_all while busy tops up the queue — no emergency stop."""
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    await coord.async_toggle_zone("z1")
+    await advance(hass, 3)  # past pump pressure
+    assert coord.rt.state == STATE_WATERING
+    assert coord.active_zone_id() == "z1"
+
+    await coord.async_water_all(from_timer=True)
+    # z1 keeps watering; z2 is appended for the daily run.
+    assert coord.rt.state == STATE_WATERING
+    assert "z1" in coord.rt.active
+    assert coord.rt.queue == ["z2"]
+    assert coord.rt.started_by_timer is True
+
+
+async def test_toggle_paused_zone_cancels_resume(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """Tapping a zone paused for a backwash cancels it instead of re-queueing it."""
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    await coord.async_toggle_zone("z1")
+    await advance(hass, 3)
+    assert coord.rt.state == STATE_WATERING
+    await coord.async_backwash_now()
+    assert "z1" in coord.rt.paused
+
+    await coord.async_toggle_zone("z1")
+    assert coord.rt.paused == {}
+    assert "z1" not in coord.rt.queue
+
+    # The backwash completes and — with nothing left to resume — goes idle.
+    await advance(hass, 10)
+    assert coord.rt.state == STATE_IDLE
+    assert coord.rt.active == {}
+
+
+async def test_queue_remaining_holds_during_backwash(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """The queue countdown keeps counting paused zones while a backwash runs."""
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    await coord.async_toggle_zone("z1")
+    await coord.async_toggle_zone("z2")
+    await advance(hass, 3)
+    assert coord.rt.state == STATE_WATERING
+    before = coord.queue_remaining_seconds()
+
+    await coord.async_backwash_now()
+    await advance(hass, 1)  # pending request honored → backwash phase
+    assert coord.rt.state in BACKWASH_ACTIVE_STATES
+    during = coord.queue_remaining_seconds()
+    # Holds steady (paused z1 still counted) instead of collapsing to z2 only.
+    assert during >= before - 1
+
+
+async def test_manual_pump_refused_during_backwash(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """Manual pump control (both directions) is refused during a backwash."""
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    await coord.async_backwash_now()
+    assert coord.rt.state == STATE_BACKWASH_PRESSURE
+    assert await coord.async_manual_pump(True) is False
+    assert await coord.async_manual_pump(False) is False
+
+
+async def test_pending_backwash_without_valve_resumes_paused_zones(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """Un-configuring the backwash valve while a wash is pending resumes watering."""
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    await coord.async_toggle_zone("z1")
+    await advance(hass, 3)
+    assert coord.rt.state == STATE_WATERING
+    await coord.async_backwash_now()
+    assert "z1" in coord.rt.paused
+
+    coord.update_config(make_config(backwash=None))
+    await advance(hass, 1)  # pending honored, no valve → resume instead
+    assert coord.rt.state == STATE_WATERING
+    assert "z1" in coord.rt.active
+    assert coord.rt.paused == {}
+
+
+async def test_hass_stop_mid_run_closes_everything(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """The HA-stop handler shuts all hardware off when a run is active."""
+    turn_on, turn_off = mock_switch_services
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    await coord.async_toggle_zone("z1")
+    await advance(hass, 3)
+    assert coord.rt.state == STATE_WATERING
+
+    await coord._on_hass_stop(None)
+    assert coord.rt.state == STATE_IDLE
+    assert _last_call(turn_off, ZONE1_ENTITY) is not None
+    assert _last_call(turn_off, PUMP_ENTITY) is not None
+
+
+async def test_startup_sweep_closes_stray_valves(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """Valves (and then the pump) left 'on' by a crash are closed after startup."""
+    turn_on, turn_off = mock_switch_services
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    hass.states.async_set(ZONE1_ENTITY, "on")
+    hass.states.async_set(PUMP_ENTITY, "on")
+
+    await coord._async_startup_sweep(hass)
+    assert _last_call(turn_off, ZONE1_ENTITY) is not None
+    assert _last_call(turn_off, PUMP_ENTITY) is not None
+
+
+async def test_startup_sweep_leaves_manual_pump_alone(
+    hass: HomeAssistant,
+    setup_integration: MockConfigEntry,
+    mock_switch_services: tuple[list, list],
+) -> None:
+    """Pump on with all valves closed looks like manual (hose) use — keep it."""
+    turn_on, turn_off = mock_switch_services
+    coord: IrrigationCoordinator = setup_integration.runtime_data
+    hass.states.async_set(PUMP_ENTITY, "on")
+
+    await coord._async_startup_sweep(hass)
+    assert _last_call(turn_off, PUMP_ENTITY) is None

@@ -120,3 +120,58 @@ async def test_reconfigure_flow_updates_entry(
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_PUMP] == new_pump
     assert entry.data["pump_pressure_delay"] == 7
+
+
+async def test_reconfigure_applies_over_stale_options(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Reconfigured globals must not be shadowed by values saved in options."""
+    entry = setup_integration
+    # Simulate an earlier options-flow save that mirrored globals into options.
+    hass.config_entries.async_update_entry(entry, options=make_config(pump_delay=50))
+    await hass.async_block_till_done()
+    assert entry.runtime_data.pump_delay == 50
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_PUMP: PUMP_ENTITY,
+            CONF_BACKWASH: BACKWASH_ENTITY,
+            "pump_pressure_delay": 7,
+            "backwash_pressure_delay": 5,
+            "backwash_runtime": 10,
+            "backwash_flush_runtime": 5,
+            "backwash_interval": 0,
+            "backwash_threshold": 0,
+        },
+    )
+    assert result["reason"] == "reconfigure_successful"
+    await hass.async_block_till_done()
+    # The reconfigured value wins — no stale option shadows it anymore.
+    assert entry.runtime_data.pump_delay == 7
+
+
+async def test_reconfigure_clears_optional_switch(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Leaving the backwash selector empty on reconfigure disables backwash."""
+    entry = setup_integration
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_PUMP: PUMP_ENTITY,
+            # CONF_BACKWASH intentionally omitted = cleared in the UI.
+            "pump_pressure_delay": 7,
+            "backwash_pressure_delay": 5,
+            "backwash_runtime": 10,
+            "backwash_flush_runtime": 5,
+            "backwash_interval": 0,
+            "backwash_threshold": 0,
+        },
+    )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_BACKWASH] is None
+    await hass.async_block_till_done()
+    assert entry.runtime_data.backwash_switch is None

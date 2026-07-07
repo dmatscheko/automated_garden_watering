@@ -220,6 +220,36 @@ async def test_options_flow_edit_existing_zone(hass: HomeAssistant) -> None:
     assert z1[CONF_ZONE_DURATION] == 120
 
 
+async def test_options_flow_clears_optional_switches(
+    hass: HomeAssistant, setup_integration: MockConfigEntry
+) -> None:
+    """Submitting globals with pump/backwash cleared actually removes them.
+
+    A cleared EntitySelector is simply absent from user_input; the flow must
+    store an explicit None so the merge with entry.data can't resurrect the
+    old switches.
+    """
+    entry = setup_integration
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "globals"}
+    )
+    user_input = _globals_user_input()
+    del user_input[CONF_PUMP]
+    del user_input[CONF_BACKWASH]
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], user_input
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_PUMP] is None
+    assert entry.options[CONF_BACKWASH] is None
+
+    # The live coordinator picks the change up via the update listener.
+    await hass.async_block_till_done()
+    assert entry.runtime_data.pump_switch is None
+    assert entry.runtime_data.backwash_switch is None
+
+
 async def test_options_flow_delete_zone(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
         domain=DOMAIN, data=make_config(), unique_id=DOMAIN, title="x"
