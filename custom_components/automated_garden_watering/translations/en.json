@@ -33,14 +33,16 @@
           "entity_id": "Zone valve switch",
           "duration": "Default watering duration (seconds)",
           "order": "Run order for 'Water all' (lower runs first)",
-          "max_parallel": "Max parallel zones (1 = always runs alone)"
+          "max_parallel": "Max parallel zones (1 = always runs alone)",
+          "auto_watering": "Include in automatic watering"
         },
         "data_description": {
           "name": "Friendly name shown in the dashboard.",
           "entity_id": "The Home Assistant switch entity that opens this zone's valve.",
           "duration": "Default time this zone runs. Effective time = duration × global multiplier.",
           "order": "Smaller numbers run earlier. Use gaps (10, 20, 30…) to make later reordering easier.",
-          "max_parallel": "Up to how many zones this one tolerates running with simultaneously. Use a value above 1 for low-flow zones (drip lines, small sprinklers) — when two or more such zones are queued back-to-back, they water in parallel, capped by the lowest max_parallel in the group. Default 1 = the zone never runs in parallel with others."
+          "max_parallel": "Up to how many zones this one tolerates running with simultaneously. Use a value above 1 for low-flow zones (drip lines, small sprinklers) — when two or more such zones are queued back-to-back, they water in parallel, capped by the lowest max_parallel in the group. Default 1 = the zone never runs in parallel with others.",
+          "auto_watering": "Off = the daily timer and 'Water all' skip this zone. You can still water it manually via its zone button or the water_zone action; its dashboard icon becomes a hollow drop."
         }
       },
       "zone_more": {
@@ -120,6 +122,7 @@
           "duration": "Default watering duration (seconds)",
           "order": "Run order for 'Water all' (lower runs first)",
           "max_parallel": "Max parallel zones (1 = always runs alone)",
+          "auto_watering": "Include in automatic watering",
           "delete_zone": "Delete this zone"
         },
         "data_description": {
@@ -128,6 +131,7 @@
           "duration": "Default seconds; effective time = duration × multiplier.",
           "order": "Smaller numbers run earlier.",
           "max_parallel": "Up to how many zones this one tolerates running with simultaneously. The group cap is the lowest value among queued zones running together. Default 1 = never runs in parallel.",
+          "auto_watering": "Off = the daily timer and 'Water all' skip this zone; manual watering still works and its dashboard icon becomes a hollow drop.",
           "delete_zone": "Tick this and press Submit to permanently remove this zone. Leave unticked to save your edits."
         }
       }
@@ -173,7 +177,7 @@
   "services": {
     "water_all": {
       "name": "Water all",
-      "description": "Run every configured zone in run order. Calling this while a queue is active stops the queue (emergency stop)."
+      "description": "Run every zone included in automatic watering, in run order. Calling this while a queue is active stops the queue (emergency stop)."
     },
     "stop": {
       "name": "Stop",

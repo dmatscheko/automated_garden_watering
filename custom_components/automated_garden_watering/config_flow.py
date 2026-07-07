@@ -19,6 +19,7 @@ from .const import (
     CONF_BACKWASH_THRESHOLD,
     CONF_PUMP,
     CONF_PUMP_DELAY,
+    CONF_ZONE_AUTO,
     CONF_ZONE_DURATION,
     CONF_ZONE_ENTITY,
     CONF_ZONE_ID,
@@ -32,6 +33,7 @@ from .const import (
     DEFAULT_BACKWASH_RUNTIME,
     DEFAULT_BACKWASH_THRESHOLD,
     DEFAULT_PUMP_DELAY,
+    DEFAULT_ZONE_AUTO,
     DEFAULT_ZONE_DURATION,
     DEFAULT_ZONE_MAX_PARALLEL,
     DOMAIN,
@@ -168,6 +170,10 @@ def _zone_schema(
         ): selector.NumberSelector(
             selector.NumberSelectorConfig(min=1, max=10, step=1, mode=selector.NumberSelectorMode.BOX)
         ),
+        vol.Required(
+            CONF_ZONE_AUTO,
+            default=zone.get(CONF_ZONE_AUTO, DEFAULT_ZONE_AUTO),
+        ): selector.BooleanSelector(),
     }
     if allow_delete:
         # Shown only when editing an existing zone. Tick + submit to remove it.

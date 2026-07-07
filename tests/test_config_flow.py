@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.automated_garden_watering.const import (
     CONF_BACKWASH,
     CONF_PUMP,
+    CONF_ZONE_AUTO,
     CONF_ZONE_DURATION,
     CONF_ZONE_ENTITY,
     CONF_ZONE_NAME,
@@ -218,6 +219,37 @@ async def test_options_flow_edit_existing_zone(hass: HomeAssistant) -> None:
     z1 = next(z for z in zones if z["id"] == "z1")
     assert z1[CONF_ZONE_NAME] == "Renamed"
     assert z1[CONF_ZONE_DURATION] == 120
+    # Untouched in the form → keeps its default (included in auto watering).
+    assert z1[CONF_ZONE_AUTO] is True
+
+
+async def test_options_flow_excludes_zone_from_auto_watering(hass: HomeAssistant) -> None:
+    """Unticking 'Include in automatic watering' persists on the zone."""
+    entry = MockConfigEntry(
+        domain=DOMAIN, data=make_config(), unique_id=DOMAIN, title="x"
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "zones_list"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"action": "edit:z2"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_ZONE_NAME: "Zone 2",
+            CONF_ZONE_ENTITY: ZONE2_ENTITY,
+            CONF_ZONE_DURATION: 5,
+            CONF_ZONE_ORDER: 2,
+            CONF_ZONE_AUTO: False,
+            "delete_zone": False,
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    z2 = next(z for z in entry.options[CONF_ZONES] if z["id"] == "z2")
+    assert z2[CONF_ZONE_AUTO] is False
 
 
 async def test_options_flow_clears_optional_switches(

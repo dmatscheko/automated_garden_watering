@@ -112,7 +112,6 @@ class GenerateDashboardButton(IrrigationBaseEntity, ButtonEntity):
 class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
     # User-supplied display name; rendered via the `name` property below.
     # No translation_key, so HA uses the dynamic property directly.
-    _attr_icon = "mdi:water"
 
     def __init__(self, coordinator: IrrigationCoordinator, zone_id: str) -> None:
         zone = coordinator.zones[zone_id]
@@ -127,6 +126,15 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
         zone = self.coordinator.zones.get(self._zone_id)
         # _attr_name was set in __init__ and is always a non-None str here.
         return zone.name if zone else (self._attr_name or "Zone")
+
+    @property
+    def icon(self) -> str:
+        # Hollow drop marks a zone excluded from automatic watering
+        # (manual-only); dashboards inherit it when they don't set an icon.
+        zone = self.coordinator.zones.get(self._zone_id)
+        if zone and not zone.auto_watering:
+            return "mdi:water-outline"
+        return "mdi:water"
 
     @property
     def available(self) -> bool:
@@ -158,6 +166,7 @@ class ZoneToggleButton(IrrigationBaseEntity, ButtonEntity):
             "zone_name": zone.name,
             "default_duration_seconds": zone.duration,
             "max_parallel": zone.max_parallel,
+            "auto_watering": zone.auto_watering,
             "run_order": zone.order,
             "queue_position": position,
             "is_active": is_active,

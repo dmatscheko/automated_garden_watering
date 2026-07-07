@@ -118,7 +118,7 @@ def _styled_active(color: str) -> dict[str, Any]:
 def _button_card(
     eid: str,
     name: str,
-    icon: str,
+    icon: str | None,
     states: list[dict[str, Any]],
     label: str | None = None,
 ) -> dict[str, Any]:
@@ -126,11 +126,12 @@ def _button_card(
         "type": "custom:button-card",
         "entity": eid,
         "name": name,
-        "icon": icon,
         "show_state": False,
         "tap_action": _press_action(eid),
         "state": states,
     }
+    if icon is not None:
+        card["icon"] = icon
     if label is not None:
         card["show_label"] = True
         card["label"] = label
@@ -281,7 +282,11 @@ def build_dashboard(hass: HomeAssistant, coordinator: IrrigationCoordinator) -> 
             _button_card(
                 eid,
                 zone.name,
-                "mdi:water",
+                # No icon override: the card inherits the entity's icon, which
+                # is mdi:water-outline while the zone is excluded from
+                # automatic watering — so the cue stays live without
+                # regenerating the dashboard.
+                None,
                 [
                     {
                         "operator": "template",

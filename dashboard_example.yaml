@@ -159,10 +159,12 @@ cards:
               ]]]
           # Repeat this block for each zone. Color reflects `status` attribute:
           #   idle = default, queued = amber, running = green.
+          # No `icon:` on purpose — the entity's own icon is used, which turns
+          # into a hollow drop (mdi:water-outline) while the zone is excluded
+          # from automatic watering.
           - type: custom:button-card  # optional; falls back to plain button if not installed
             entity: button.automated_garden_watering_zone_REPLACE_ME
             name: Zone 1
-            icon: mdi:water
             show_state: false
             tap_action:
               action: perform-action

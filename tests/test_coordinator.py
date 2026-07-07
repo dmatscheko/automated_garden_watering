@@ -15,6 +15,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.automated_garden_watering.const import (
     BACKWASH_ACTIVE_STATES,
+    CONF_ZONE_AUTO,
+    CONF_ZONES,
     DOMAIN,
     STATE_BACKWASH,
     STATE_BACKWASH_FLUSH,
@@ -532,6 +534,71 @@ async def test_full_run_seconds_uses_configured_multiplier(
     assert coord.full_run_seconds() == 10
     await coord.async_set_multiplier(2.0)
     assert coord.full_run_seconds() == 20
+
+
+async def _setup_with_z2_manual_only(hass: HomeAssistant) -> MockConfigEntry:
+    """Set up the default 2-zone config with z2 excluded from auto watering."""
+    cfg = make_config()
+    cfg[CONF_ZONES][1][CONF_ZONE_AUTO] = False
+    entry = MockConfigEntry(domain=DOMAIN, data=cfg, unique_id=DOMAIN, title="x")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def test_water_all_skips_excluded_zone(
+    hass: HomeAssistant, underlying_switch_states: None
+) -> None:
+    """'Water all' only queues zones included in automatic watering."""
+    entry = await _setup_with_z2_manual_only(hass)
+    turn_on, _turn_off = register_switch_mocks(hass)
+    coord: IrrigationCoordinator = entry.runtime_data
+
+    # The full-run estimate counts only the included zone.
+    assert coord.full_run_seconds() == 5
+
+    await coord.async_water_all(from_timer=False)
+    assert coord.rt.queue == ["z1"]
+
+    # Whole run: pump pressure (2) + z1 (5) → idle. z2's valve never opened.
+    await advance(hass, 9)
+    assert coord.rt.state == STATE_IDLE
+    assert _calls_for(turn_on, ZONE1_ENTITY)
+    assert not _calls_for(turn_on, ZONE2_ENTITY)
+
+
+async def test_timer_topup_skips_excluded_zone(
+    hass: HomeAssistant, underlying_switch_states: None
+) -> None:
+    """A timer top-up while busy never re-adds manual-only zones."""
+    entry = await _setup_with_z2_manual_only(hass)
+    register_switch_mocks(hass)
+    coord: IrrigationCoordinator = entry.runtime_data
+
+    await coord.async_toggle_zone("z1")
+    await advance(hass, 3)  # past pump pressure
+    assert coord.rt.state == STATE_WATERING
+
+    await coord.async_water_all(from_timer=True)
+    assert coord.rt.started_by_timer is True
+    # z1 is already active and z2 is manual-only → nothing gets appended.
+    assert coord.rt.queue == []
+
+
+async def test_excluded_zone_still_waters_manually(
+    hass: HomeAssistant, underlying_switch_states: None
+) -> None:
+    """A manual-only zone still waters via its own toggle / water_zone."""
+    entry = await _setup_with_z2_manual_only(hass)
+    turn_on, _turn_off = register_switch_mocks(hass)
+    coord: IrrigationCoordinator = entry.runtime_data
+
+    await coord.async_toggle_zone("z2")
+    await advance(hass, 3)  # past pump pressure
+    assert coord.rt.state == STATE_WATERING
+    assert "z2" in coord.rt.active
+    assert _calls_for(turn_on, ZONE2_ENTITY)
 
 
 async def test_manual_pump_backwash_interval(

@@ -36,6 +36,7 @@ from .const import (
     CONF_BACKWASH,
     BACKWASH_ACTIVE_STATES,
     CONF_BACKWASH_DELAY,
+    CONF_ZONE_AUTO,
     CONF_BACKWASH_FLUSH_RUNTIME,
     CONF_BACKWASH_INTERVAL,
     CONF_BACKWASH_RUNTIME,
@@ -61,6 +62,7 @@ from .const import (
     DEFAULT_DAILY_TIMER_ENABLED,
     DEFAULT_MULTIPLIER,
     DEFAULT_PUMP_DELAY,
+    DEFAULT_ZONE_AUTO,
     DEFAULT_ZONE_MAX_PARALLEL,
     DOMAIN,
     SIGNAL_UPDATE,
@@ -85,6 +87,9 @@ class Zone:
     duration: int  # seconds
     order: int
     max_parallel: int = DEFAULT_ZONE_MAX_PARALLEL
+    # False = skipped by the daily timer and 'Water all'; manual watering
+    # (zone button / water_zone action) still works.
+    auto_watering: bool = DEFAULT_ZONE_AUTO
 
 
 @dataclass
@@ -153,6 +158,7 @@ class IrrigationCoordinator:
                     1,
                     int(z.get(CONF_ZONE_MAX_PARALLEL) or DEFAULT_ZONE_MAX_PARALLEL),
                 ),
+                auto_watering=bool(z.get(CONF_ZONE_AUTO, DEFAULT_ZONE_AUTO)),
             )
         self.zones = zones
         self.pump_switch: str | None = data.get(CONF_PUMP) or None
@@ -178,6 +184,15 @@ class IrrigationCoordinator:
 
     def ordered_zone_ids(self) -> list[str]:
         return [z.id for z in sorted(self.zones.values(), key=lambda z: (z.order, z.name))]
+
+    def auto_zone_ids(self) -> list[str]:
+        """Ordered ids of the zones included in automatic watering.
+
+        Zones with auto_watering off are skipped by the daily timer and the
+        'Water all' button, but can still be watered via their zone button or
+        the water_zone action.
+        """
+        return [zid for zid in self.ordered_zone_ids() if self.zones[zid].auto_watering]
 
     def zone_position_in_queue(self, zone_id: str) -> int | None:
         try:
@@ -311,12 +326,13 @@ class IrrigationCoordinator:
     def full_run_seconds(self) -> int:
         """Duration of a complete 'Water all' run at the current multiplier.
 
-        Simulates the parallel groups the full zone list would form, so the
-        estimate already includes the time saved by zones watering together.
+        Simulates the parallel groups the auto-watering zones would form, so
+        the estimate already includes the time saved by zones watering
+        together. Zones excluded from automatic watering don't count.
         Excludes the pump-pressure delay and any backwash time.
         """
         return self._simulate_remaining_groups(
-            self.ordered_zone_ids(), 0, multiplier=self.multiplier
+            self.auto_zone_ids(), 0, multiplier=self.multiplier
         )
 
     @callback
@@ -867,16 +883,16 @@ class IrrigationCoordinator:
             if not busy:
                 rt.multiplier = self.multiplier
                 rt.started_by_timer = from_timer
-                rt.queue = self.ordered_zone_ids()
+                rt.queue = self.auto_zone_ids()
             elif from_timer:
                 # The daily timer must never act as an emergency stop. Top up
-                # the queue with every zone not already running / queued /
-                # paused, so the scheduled watering still happens after the
-                # current run.
+                # the queue with every auto-watering zone not already running /
+                # queued / paused, so the scheduled watering still happens
+                # after the current run.
                 rt.started_by_timer = True
                 skip = set(rt.queue) | set(rt.active) | set(rt.paused)
                 rt.queue.extend(
-                    zid for zid in self.ordered_zone_ids() if zid not in skip
+                    zid for zid in self.auto_zone_ids() if zid not in skip
                 )
                 if rt.state == STATE_WATERING and rt.active:
                     await self._refill_active_set()

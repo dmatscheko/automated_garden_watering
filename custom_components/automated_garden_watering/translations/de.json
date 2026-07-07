@@ -33,14 +33,16 @@
           "entity_id": "Zonenventil-Schalter",
           "duration": "Standard-Bewässerungsdauer (Sekunden)",
           "order": "Reihenfolge für „Alles bewässern“ (kleiner zuerst)",
-          "max_parallel": "Maximal parallele Zonen (1 = läuft immer allein)"
+          "max_parallel": "Maximal parallele Zonen (1 = läuft immer allein)",
+          "auto_watering": "Bei automatischer Bewässerung einbeziehen"
         },
         "data_description": {
           "name": "Anzeigename, der im Dashboard erscheint.",
           "entity_id": "Die Home-Assistant-Schalter-Entität, die das Ventil dieser Zone öffnet.",
           "duration": "Standardlaufzeit dieser Zone. Effektive Zeit = Dauer × globaler Multiplikator.",
           "order": "Kleinere Zahlen laufen zuerst. Nutze Lücken (10, 20, 30 …), um späteres Umsortieren zu erleichtern.",
-          "max_parallel": "Mit wie vielen Zonen diese gleichzeitig laufen darf. Bei Werten über 1 werden mehrere direkt hintereinander eingereihte Zonen parallel bewässert; das Gruppen-Maximum entspricht dem kleinsten Wert in der Gruppe. Standard 1 = läuft nie parallel mit anderen."
+          "max_parallel": "Mit wie vielen Zonen diese gleichzeitig laufen darf. Bei Werten über 1 werden mehrere direkt hintereinander eingereihte Zonen parallel bewässert; das Gruppen-Maximum entspricht dem kleinsten Wert in der Gruppe. Standard 1 = läuft nie parallel mit anderen.",
+          "auto_watering": "Aus = Tages-Timer und „Alles bewässern“ überspringen diese Zone. Manuell bewässern (Zonen-Button oder Aktion water_zone) geht weiterhin; ihr Dashboard-Symbol wird zum hohlen Tropfen."
         }
       },
       "zone_more": {
@@ -114,6 +116,7 @@
           "duration": "Standard-Bewässerungsdauer (Sekunden)",
           "order": "Reihenfolge für „Alles bewässern“ (kleiner zuerst)",
           "max_parallel": "Maximal parallele Zonen (1 = läuft immer allein)",
+          "auto_watering": "Bei automatischer Bewässerung einbeziehen",
           "delete_zone": "Diese Zone löschen"
         },
         "data_description": {
@@ -122,6 +125,7 @@
           "duration": "Standardsekunden; effektive Zeit = Dauer × Multiplikator.",
           "order": "Kleinere Zahlen laufen zuerst.",
           "max_parallel": "Mit wie vielen Zonen diese parallel laufen darf. Das Gruppen-Maximum ist der kleinste Wert unter den parallel laufenden Zonen. Standard 1 = läuft nie parallel.",
+          "auto_watering": "Aus = Tages-Timer und „Alles bewässern“ überspringen diese Zone; manuelle Bewässerung bleibt möglich und ihr Dashboard-Symbol wird zum hohlen Tropfen.",
           "delete_zone": "Ankreuzen und auf Senden drücken, um diese Zone dauerhaft zu entfernen. Nicht angekreuzt lassen, um deine Änderungen zu speichern."
         }
       }
@@ -167,7 +171,7 @@
   "services": {
     "water_all": {
       "name": "Alles bewässern",
-      "description": "Bewässert alle konfigurierten Zonen in ihrer Reihenfolge. Während eine Warteschlange aktiv ist, stoppt der Aufruf sie (Not-Aus)."
+      "description": "Bewässert alle Zonen, die in der automatischen Bewässerung enthalten sind, in ihrer Reihenfolge. Während eine Warteschlange aktiv ist, stoppt der Aufruf sie (Not-Aus)."
     },
     "stop": {
       "name": "Stoppen",

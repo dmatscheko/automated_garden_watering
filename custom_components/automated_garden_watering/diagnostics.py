@@ -50,6 +50,7 @@ async def async_get_config_entry_diagnostics(
                     "duration": z.duration,
                     "order": z.order,
                     "max_parallel": z.max_parallel,
+                    "auto_watering": z.auto_watering,
                     "last_run": (
                         last_run.isoformat()
                         if (last_run := coordinator.zone_last_run(z.id))

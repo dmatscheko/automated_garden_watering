@@ -19,7 +19,11 @@ What sets it apart from other irrigation integrations: a **two-stage, interval-d
 - UI config flow + options flow (everything is editable later).
 - Queue model: zones queue back-to-back; low-flow zones can opt into
   **parallel execution** via a per-zone `max_parallel` setting (default 1).
-- "Water all" runs every zone in your configured run order.
+- "Water all" runs every zone in your configured run order. Zones can be
+  excluded from automatic watering (per-zone *Include in automatic watering*
+  setting): the daily timer and *Water all* skip them, but they can still be
+  watered manually via their zone button. Excluded zones show a hollow drop
+  icon instead of the filled one.
 - Pump is always turned on first, with configurable pressure build-up delay.
 - Two-stage backwash (pump-off reverse flow + pump-on flush) for a much deeper filter clean; triggered manually at any time, automatically every N minutes of active watering, and at end-of-queue when the run was long enough or was started by the timer. Optionally (via the *Manual pump backwash* switch) the same interval also covers manual pump (hose) use — the pump is handed back after the wash.
 - Global watering duration multiplier (e.g. `2.5` = water 2.5× longer than the per-zone default).
@@ -40,7 +44,7 @@ What sets it apart from other irrigation integrations: a **two-stage, interval-d
 
 The setup flow asks for the pump and backwash switch (both optional), and at least one zone. After setup, use *Configure* on the integration card to:
 
-- Add / remove / reorder zones (each: switch entity, display name, default duration, run order). Delete a zone from inside its edit screen (tick *Delete this zone*).
+- Add / remove / reorder zones (each: switch entity, display name, default duration, run order, max parallel, include in automatic watering). Delete a zone from inside its edit screen (tick *Delete this zone*).
 - Adjust the pump/backwash delays, the backwash reverse-flow and flush times, automatic backwash interval and end-of-queue threshold.
 
 The **watering multiplier**, **daily start time** and **daily timer** are *not*
@@ -113,9 +117,9 @@ cleans the filter far better than just opening the valve:
 
 | Entity | Description |
 |---|---|
-| `button.automated_garden_watering_water_all` | Run all zones in order; pressing again while queue is active = emergency stop. Attribute `running` for coloring. |
+| `button.automated_garden_watering_water_all` | Run all zones included in automatic watering, in order; pressing again while queue is active = emergency stop. Attribute `running` for coloring. |
 | `button.automated_garden_watering_backwash` | Immediate backwash (never queued). Attributes `status` (`running`/`idle`) for coloring and `last_run` / `last_run_friendly` for showing when it last ran (persisted across restarts). |
-| `button.automated_garden_watering_zone_<name-slug>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<name-slug>` suffix is the slugified zone display name (e.g. `Fensterblumen` → `…_zone_fensterblumen`), so the entity_id stays meaningful and survives reordering. If two zones slugify to the same value, the lower-`order` one keeps the bare slug and the other gets `_2`, `_3`, … appended. The friendly name is also in the `zone_name` attribute. Attributes `last_run` (ISO) and `last_run_friendly` (e.g. `Today 14:30`, `Yesterday 09:00`, `Mon 09:00`, `May 03`) record when the zone last watered (persisted across restarts). |
+| `button.automated_garden_watering_zone_<name-slug>` | Toggle that zone in the queue (press to add, press again to remove/stop). The `<name-slug>` suffix is the slugified zone display name (e.g. `Fensterblumen` → `…_zone_fensterblumen`), so the entity_id stays meaningful and survives reordering. If two zones slugify to the same value, the lower-`order` one keeps the bare slug and the other gets `_2`, `_3`, … appended. The friendly name is also in the `zone_name` attribute. Attributes `last_run` (ISO) and `last_run_friendly` (e.g. `Today 14:30`, `Yesterday 09:00`, `Mon 09:00`, `May 03`) record when the zone last watered (persisted across restarts). The `auto_watering` attribute mirrors the zone's *Include in automatic watering* setting; while off, the entity icon switches from `mdi:water` to `mdi:water-outline` (dashboards that don't override the icon show the cue automatically). |
 | `switch.automated_garden_watering_pump_manual` | Manual well-pump control for e.g. a garden hose (only created if a pump is configured). Manual control is blocked while a queue/backwash is active (the state machine owns the pump then), so neither the pump-first rule nor the pump-off reverse-flow stage can be broken manually. Attributes `status`, `last_run`, `last_run_friendly`, `controlled_by` (`manual`/`automation`) — so it can be shown as a button with a last-run line like the zones. |
 | `switch.automated_garden_watering_manual_pump_backwash` | Enables automatic backwashes during **manual pump** (hose) use (created when both pump and backwash valve are configured; off by default, persisted across restarts). While on, manual pumping counts toward the same *Automatic backwash interval* as zone watering; when it elapses, the two-stage wash runs and the pump is turned back on afterwards so the hose session continues. Also applies to the Backwash button: pressed during hose use, the pump is handed back after the wash. |
 | `button.automated_garden_watering_dashboard_yaml` | Config button (display name *Dashboard YAML*): generates a complete dashboard YAML for your exact entities/zones and shows it in a notification you can copy from. |
